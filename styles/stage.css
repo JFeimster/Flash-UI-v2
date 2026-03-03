@@ -1,0 +1,305 @@
+
+/* styles/stage.css */
+
+/* === Stage (The Deck) === */
+.stage-container {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+/* === Start Screen Ambient Effects === */
+.empty-state {
+    position: absolute;
+    inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    text-align: center;
+    color: var(--text-secondary);
+    opacity: 1;
+    transform: scale(1);
+    transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1), 
+                transform 0.8s cubic-bezier(0.4, 0, 0.2, 1),
+                visibility 0s linear 0.8s;
+    z-index: 0;
+    animation: ambientFadeIn 1.5s ease-out forwards;
+    padding: 20px;
+}
+
+@keyframes ambientFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.empty-state.fade-out {
+    opacity: 0;
+    transform: scale(1.1);
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.empty-content {
+    position: relative; z-index: 1;
+    display: flex; flex-direction: column; align-items: center; gap: 24px;
+    width: 100%;
+}
+
+.empty-content h1 { 
+    color: var(--text-primary); 
+    font-weight: 800; 
+    letter-spacing: -0.05em; 
+    font-size: 6rem;
+    margin: 0;
+    background: linear-gradient(to bottom right, #fff, #aaa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    opacity: 0;
+    animation: dramaticEntrance 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation-delay: 0.2s;
+    text-shadow: 0 10px 30px rgba(255,255,255,0.1);
+    line-height: 1;
+}
+
+.empty-content p {
+    font-size: 1.4rem;
+    max-width: 600px;
+    line-height: 1.4;
+    margin: 0;
+    opacity: 0;
+    color: var(--text-secondary);
+    animation: dramaticEntrance 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation-delay: 0.5s;
+}
+
+@keyframes dramaticEntrance {
+    0% {
+        opacity: 0;
+        filter: blur(20px);
+        transform: translateY(40px) scale(0.95);
+    }
+    100% {
+        opacity: 1;
+        filter: blur(0);
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* === Session Group & Grid === */
+.session-group {
+    position: absolute;
+    width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    transition: 
+        transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1), 
+        opacity 0.7s ease,
+        filter 0.7s ease;
+    transform-style: preserve-3d;
+}
+
+.session-group.active-session {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+    z-index: 10;
+    pointer-events: auto;
+}
+
+.session-group.past-session {
+    transform: translateX(-120%) translateZ(-300px);
+    opacity: 0;
+    z-index: 5;
+    pointer-events: none;
+}
+
+.session-group.future-session {
+    transform: translateX(120%) translateZ(-300px);
+    opacity: 0;
+    z-index: 5;
+    pointer-events: none;
+}
+
+.artifact-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 24px;
+    width: 95%; max-width: 1600px;
+    height: 70vh;
+    perspective: 1000px;
+    transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Mode: Focus (Grid behaves differently) */
+.stage-container.mode-focus .artifact-grid {
+    pointer-events: none;
+}
+
+/* === Artifact Card === */
+.artifact-card {
+    position: relative;
+    background: #111;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+    display: flex; flex-direction: column;
+    cursor: pointer;
+    transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5);
+    transform-origin: center center;
+    pointer-events: auto;
+}
+
+.artifact-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-color);
+    background: rgba(0,0,0,0.2);
+    display: flex; justify-content: center;
+    font-size: 0.8rem; letter-spacing: 0.05em; text-transform: uppercase;
+    color: var(--text-secondary);
+    transition: opacity 0.3s;
+}
+.artifact-style-tag {
+    background: rgba(255,255,255,0.05);
+    padding: 4px 8px; border-radius: 4px;
+}
+
+.artifact-card:hover {
+    border-color: rgba(255,255,255,0.3);
+    transform: translateY(-4px);
+    box-shadow: 0 20px 40px -10px rgba(0,0,0,0.7);
+}
+
+.artifact-card-inner {
+    flex: 1; position: relative; background: #fff;
+    width: 100%; height: 100%;
+}
+
+.artifact-iframe {
+    width: 100%; height: 100%; border: none; display: block;
+    pointer-events: none;
+}
+
+/* === Focus Mode Styles === */
+.stage-container.mode-focus .artifact-card {
+    opacity: 0;
+    pointer-events: none;
+    transform: scale(0.8);
+}
+
+.stage-container.mode-focus .artifact-card.focused {
+    position: fixed;
+    top: 50%; left: 50%;
+    width: 90vw; max-width: 1200px;
+    height: 85vh;
+    transform: translate(-50%, -50%);
+    z-index: 100;
+    opacity: 1;
+    pointer-events: auto;
+    box-shadow: 0 50px 100px -20px rgba(0,0,0,0.8);
+    border-color: rgba(255,255,255,0.1);
+    cursor: default;
+}
+
+.stage-container.mode-focus {
+    perspective: none !important;
+}
+.stage-container.mode-focus .session-group.active-session {
+    transform: none !important;
+    transform-style: flat !important;
+}
+.stage-container.mode-focus .artifact-grid {
+    transform: none !important;
+    perspective: none !important;
+}
+
+.stage-container.mode-focus .artifact-card.focused .artifact-header {
+    display: none;
+}
+
+.stage-container.mode-focus .artifact-card.focused .artifact-iframe {
+    pointer-events: auto;
+}
+
+/* === Generating State === */
+.artifact-card.generating {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 20px rgba(255,255,255,0.1);
+}
+
+.generating-overlay {
+    position: absolute; inset: 0;
+    z-index: 20;
+    background: rgba(0,0,0,0.9);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+}
+
+.code-stream-preview {
+    margin: 0; padding: 20px;
+    color: #4ade80;
+    font-family: 'Roboto Mono', monospace;
+    font-size: 11px;
+    line-height: 1.4;
+    white-space: pre-wrap; word-break: break-all;
+    overflow: hidden;
+    mask-image: linear-gradient(to bottom, transparent, black 20%);
+    opacity: 0.9;
+}
+
+/* === Navigation Handles === */
+.nav-handle {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    background: transparent; border: none; color: var(--text-secondary);
+    padding: 20px; cursor: pointer; z-index: 80;
+    opacity: 0; transition: opacity 0.3s ease, color 0.2s ease;
+}
+.immersive-app:hover .nav-handle { opacity: 0.5; }
+.nav-handle:hover { opacity: 1 !important; color: var(--text-primary); }
+.nav-handle.left { left: 10px; }
+.nav-handle.right { right: 10px; }
+
+/* Responsive Grid for smaller screens */
+@media (max-width: 1024px) {
+    .creator-credit.hide-on-mobile {
+        display: none !important;
+    }
+
+    .artifact-grid {
+        grid-template-columns: 1fr;
+        height: 100%;
+        max-height: 100vh;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        padding: 40px 20px 160px 20px;
+        width: 100%;
+        box-sizing: border-box;
+        gap: 20px;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .stage-container.mode-focus .artifact-grid {
+        overflow-y: hidden !important;
+        pointer-events: none;
+        height: 100vh;
+    }
+    
+    .artifact-card {
+        min-height: 350px;
+        flex-shrink: 0;
+    }
+
+    .empty-content h1 {
+        font-size: 3.5rem;
+    }
+
+    .stage-container.mode-focus .artifact-card.focused {
+        width: 92vw;
+        height: 65vh; 
+        top: 40%;
+        left: 50%;
+        transform: translate(-50%, -40%) !important;
+    }
+}

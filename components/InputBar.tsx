@@ -1,0 +1,202 @@
+
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+*/
+
+import React, { useState, useEffect, useRef } from 'react';
+import { GoogleGenAI } from '@google/genai';
+import { LayoutIcon, ThinkingIcon, ArrowUpIcon, AttachmentIcon, XIcon, SparklesIcon } from './Icons';
+import { INITIAL_PLACEHOLDERS } from '../constants';
+import { SuggestedComponent } from '../types';
+
+interface InputBarProps {
+    inputValue: string;
+    setInputValue: (val: string) => void;
+    isLoading: boolean;
+    currentPrompt?: string;
+    onSend: (attachments?: { mimeType: string, data: string }[]) => void;
+    onTemplateClick: () => void;
+    inputRef: React.RefObject<HTMLInputElement>;
+    suggestions: SuggestedComponent[];
+    onSuggestionClick: (suggestion: SuggestedComponent) => void;
+}
+
+export default function InputBar({ 
+    inputValue, 
+    setInputValue, 
+    isLoading, 
+    currentPrompt,
+    onSend, 
+    onTemplateClick,
+    inputRef,
+    suggestions,
+    onSuggestionClick
+}: InputBarProps) {
+    const [placeholderIndex, setPlaceholderIndex] = useState(0);
+    const [placeholders, setPlaceholders] = useState<string[]>(INITIAL_PLACEHOLDERS);
+    const [attachments, setAttachments] = useState<{ mimeType: string, data: string }[]>([]);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Cycle placeholders
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setPlaceholderIndex(prev => (prev + 1) % placeholders.length);
+        }, 3000);
+        return () => clearInterval(interval);
+    }, [placeholders.length]);
+
+    // Dynamic placeholder generation on load
+    useEffect(() => {
+        const fetchDynamicPlaceholders = async () => {
+            try {
+                const apiKey = process.env.API_KEY;
+                if (!apiKey) return;
+                const ai = new GoogleGenAI({ apiKey });
+                const response = await ai.models.generateContent({
+                    model: 'gemini-3-flash-preview',
+                    contents: { 
+                        role: 'user', 
+                        parts: [{ 
+                            text: 'Generate 20 creative, short, diverse UI component prompts (e.g. "bioluminescent task list"). Return ONLY a raw JSON array of strings. IP SAFEGUARD: Avoid referencing specific famous artists, movies, or brands.' 
+                        }] 
+                    }
+                });
+                const text = response.text || '[]';
+                const jsonMatch = text.match(/\[[\s\S]*\]/);
+                if (jsonMatch) {
+                    const newPlaceholders = JSON.parse(jsonMatch[0]);
+                    if (Array.isArray(newPlaceholders) && newPlaceholders.length > 0) {
+                        const shuffled = newPlaceholders.sort(() => 0.5 - Math.random()).slice(0, 10);
+                        setPlaceholders(prev => [...prev, ...shuffled]);
+                    }
+                }
+            } catch (e) {
+                console.warn("Silently failed to fetch dynamic placeholders", e);
+            }
+        };
+        setTimeout(fetchDynamicPlaceholders, 1000);
+    }, []);
+
+    const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+        if (event.key === 'Enter' && !isLoading) {
+          event.preventDefault();
+          handleSend();
+        } else if (event.key === 'Tab' && !inputValue && !isLoading) {
+            event.preventDefault();
+            setInputValue(placeholders[placeholderIndex]);
+        }
+    };
+
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const base64 = (event.target?.result as string).split(',')[1];
+                setAttachments(prev => [...prev, { mimeType: file.type, data: base64 }]);
+            };
+            reader.readAsDataURL(file);
+        }
+        // Reset input so same file can be selected again
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
+    const removeAttachment = (index: number) => {
+        setAttachments(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const handleSend = () => {
+        onSend(attachments);
+        setAttachments([]);
+    };
+
+    return (
+        <div className="floating-input-container">
+            {suggestions.length > 0 && !isLoading && (
+                <div className="suggestions-row">
+                    <div className="suggestions-label">
+                        <SparklesIcon /> Suggested:
+                    </div>
+                    {suggestions.map((s, i) => (
+                        <button 
+                            key={i} 
+                            className="suggestion-chip"
+                            onClick={() => onSuggestionClick(s)}
+                        >
+                            <span className="suggestion-icon">{s.icon}</span>
+                            <span className="suggestion-name">{s.name}</span>
+                        </button>
+                    ))}
+                </div>
+            )}
+            <div className={`input-wrapper ${isLoading ? 'loading' : ''} ${attachments.length > 0 ? 'has-attachments' : ''}`}>
+                
+                {attachments.length > 0 && (
+                    <div className="attachment-preview-list">
+                        {attachments.map((att, i) => (
+                            <div key={i} className="attachment-preview">
+                                <img src={`data:${att.mimeType};base64,${att.data}`} alt="attachment" />
+                                <button className="attachment-remove" onClick={() => removeAttachment(i)}>
+                                    <XIcon />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                <div className="input-row">
+                    <button 
+                        className="layout-button" 
+                        onClick={onTemplateClick}
+                        disabled={isLoading}
+                        title="Templates"
+                    >
+                        <LayoutIcon />
+                    </button>
+
+                    <button 
+                        className="attachment-button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isLoading}
+                        title="Add Image"
+                    >
+                        <AttachmentIcon />
+                    </button>
+                    <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        style={{ display: 'none' }} 
+                        accept="image/*" 
+                        onChange={handleFileSelect}
+                    />
+
+                    {(!inputValue && !isLoading && attachments.length === 0) && (
+                        <div className="animated-placeholder" key={placeholderIndex}>
+                            <span className="placeholder-text">{placeholders[placeholderIndex]}</span>
+                            <span className="tab-hint">Tab</span>
+                        </div>
+                    )}
+                    {!isLoading ? (
+                        <input 
+                            ref={inputRef}
+                            type="text" 
+                            value={inputValue} 
+                            onChange={(e) => setInputValue(e.target.value)} 
+                            onKeyDown={handleKeyDown} 
+                            disabled={isLoading} 
+                        />
+                    ) : (
+                        <div className="input-generating-label">
+                            <span className="generating-prompt-text">{currentPrompt}</span>
+                            <ThinkingIcon />
+                        </div>
+                    )}
+                    <button className="send-button" onClick={handleSend} disabled={isLoading || (!inputValue.trim() && attachments.length === 0)}>
+                        <ArrowUpIcon />
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
