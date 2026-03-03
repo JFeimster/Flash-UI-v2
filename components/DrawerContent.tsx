@@ -46,6 +46,10 @@ export default function DrawerContent({
     const [isSaving, setIsSaving] = useState(false);
     const [saveFeedback, setSaveFeedback] = useState('');
     const [saveType, setSaveType] = useState<'gist' | 'repo'>('gist');
+    
+    // GitHub Repo Inputs
+    const [repoNameInput, setRepoNameInput] = useState('');
+    const [branchInput, setBranchInput] = useState('main');
 
     // AI Assistant state
     const [assistantMode, setAssistantMode] = useState<'none' | 'explain' | 'refactor'>('none');
@@ -140,7 +144,8 @@ export default function DrawerContent({
                     filename: activeFile || 'index.html',
                     description: `Generated ${downloadFormat} export from Flash UI`,
                     isPublic: true,
-                    repoName: `flash-ui-${downloadFormat}-${Date.now()}`
+                    repoName: repoNameInput || `flash-ui-${downloadFormat}-${Date.now()}`,
+                    branch: branchInput
                 })
             });
             
@@ -266,24 +271,46 @@ export default function DrawerContent({
                                 <BotIcon /> Explain
                             </button>
                             {githubConnected ? (
-                                <div style={{display: 'flex', gap: '4px'}}>
-                                    <select 
-                                        className="format-select" 
-                                        style={{paddingRight: '24px', fontSize: '0.8rem'}}
-                                        value={saveType}
-                                        onChange={(e) => setSaveType(e.target.value as any)}
-                                    >
-                                        <option value="gist">Gist</option>
-                                        <option value="repo">Repo</option>
-                                    </select>
-                                    <button 
-                                        className="download-code-btn" 
-                                        onClick={handleSaveToGithub}
-                                        disabled={isSaving}
-                                        title={saveType === 'gist' ? "Save as Gist" : "Create New Repo"}
-                                    >
-                                        <GithubIcon /> {isSaving ? 'Saving...' : (saveFeedback || (saveType === 'gist' ? 'Gist' : 'Repo'))}
-                                    </button>
+                                <div style={{display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end'}}>
+                                    <div style={{display: 'flex', gap: '4px'}}>
+                                        <select 
+                                            className="format-select" 
+                                            style={{paddingRight: '24px', fontSize: '0.8rem'}}
+                                            value={saveType}
+                                            onChange={(e) => setSaveType(e.target.value as any)}
+                                        >
+                                            <option value="gist">Gist</option>
+                                            <option value="repo">Repo</option>
+                                        </select>
+                                        <button 
+                                            className="download-code-btn" 
+                                            onClick={handleSaveToGithub}
+                                            disabled={isSaving}
+                                            title={saveType === 'gist' ? "Save as Gist" : "Save to Repo"}
+                                        >
+                                            <GithubIcon /> {isSaving ? 'Saving...' : (saveFeedback || (saveType === 'gist' ? 'Gist' : 'Repo'))}
+                                        </button>
+                                    </div>
+                                    {saveType === 'repo' && (
+                                        <div style={{display: 'flex', gap: '4px'}}>
+                                            <input 
+                                                type="text" 
+                                                className="assistant-input" 
+                                                style={{width: '120px', padding: '4px 8px', fontSize: '0.8rem'}}
+                                                placeholder="Repo Name" 
+                                                value={repoNameInput}
+                                                onChange={(e) => setRepoNameInput(e.target.value)}
+                                            />
+                                            <input 
+                                                type="text" 
+                                                className="assistant-input" 
+                                                style={{width: '80px', padding: '4px 8px', fontSize: '0.8rem'}}
+                                                placeholder="Branch" 
+                                                value={branchInput}
+                                                onChange={(e) => setBranchInput(e.target.value)}
+                                            />
+                                        </div>
+                                    )}
                                 </div>
                             ) : (
                                 <button 
@@ -294,6 +321,7 @@ export default function DrawerContent({
                                     <GithubIcon /> Connect
                                 </button>
                             )}
+
                             <button 
                                 className="download-code-btn" 
                                 onClick={handleCopyEmbed}
