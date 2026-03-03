@@ -113,6 +113,32 @@ html, body {
     transform: scale(1.05);
 }
 
+.templates-button {
+    position: fixed;
+    top: 24px;
+    left: 130px;
+    z-index: 9999;
+    color: var(--text-secondary);
+    background: var(--accent-bg);
+    border: 1px solid transparent;
+    backdrop-filter: blur(4px);
+    padding: 8px 16px;
+    border-radius: 99px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.templates-button:hover {
+    color: var(--text-primary);
+    background: var(--border-color);
+    transform: scale(1.05);
+}
+
 .features-overlay {
     position: fixed;
     inset: 0;
@@ -218,7 +244,7 @@ html, body {
 .reset-button {
     position: fixed;
     top: 24px;
-    left: 130px; /* Shifted right */
+    left: 240px; /* Shifted right */
     z-index: 9999; /* Increased to ensure visibility */
     color: var(--text-secondary);
     background: var(--accent-bg);
@@ -236,7 +262,7 @@ html, body {
 .theme-toggle {
     position: fixed;
     top: 24px;
-    left: 180px; /* Shifted right */
+    left: 290px; /* Shifted right */
     z-index: 9999;
     color: var(--text-secondary);
     background: var(--accent-bg);

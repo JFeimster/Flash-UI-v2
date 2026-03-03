@@ -207,6 +207,14 @@ function App() {
             Features
         </button>
 
+        <button 
+            className="templates-button"
+            onClick={() => setDrawerState({ isOpen: true, mode: 'templates', title: 'Templates', data: null })}
+            title="Browse Templates"
+        >
+            Templates
+        </button>
+
         {hasStarted && (
             <button 
                 className="reset-button" 
