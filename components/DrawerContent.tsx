@@ -5,7 +5,7 @@
 */
 
 import React, { useState, useEffect } from 'react';
-import { ThinkingIcon, DownloadIcon, ShareIcon, GithubIcon, BotIcon, SparklesIcon, LayoutIcon, CodeIcon } from './Icons';
+import { ThinkingIcon, DownloadIcon, BotIcon, SparklesIcon, LayoutIcon, CodeIcon, CopyIcon } from './Icons';
 import { ComponentVariation, RecommendedPage, AnimationStyle } from '../types';
 import { TEMPLATES } from '../templates';
 import { ANIMATION_STYLES } from '../animations';
@@ -41,16 +41,8 @@ export default function DrawerContent({
     applyAnimation
 }: DrawerContentProps) {
     const [downloadFormat, setDownloadFormat] = useState<'static' | 'nextjs' | 'wix' | 'notion' | 'react' | 'vue' | 'svelte'>('static');
-    const [copyFeedback, setCopyFeedback] = useState(false);
-    const [githubConnected, setGithubConnected] = useState(false);
-    const [isSaving, setIsSaving] = useState(false);
-    const [saveFeedback, setSaveFeedback] = useState('');
-    const [saveType, setSaveType] = useState<'gist' | 'repo'>('gist');
+    const [fileCopyFeedback, setFileCopyFeedback] = useState(false);
     
-    // GitHub Repo Inputs
-    const [repoNameInput, setRepoNameInput] = useState('');
-    const [branchInput, setBranchInput] = useState('main');
-
     // AI Assistant state
     const [assistantMode, setAssistantMode] = useState<'none' | 'explain' | 'refactor'>('none');
     const [assistantResponse, setAssistantResponse] = useState<string>('');
@@ -69,18 +61,6 @@ export default function DrawerContent({
     const [exportedFiles, setExportedFiles] = useState<ExportedFiles>({});
 
     const isLoadingVariations = isLoading && mode === 'variations' && componentVariations.length === 0;
-
-    useEffect(() => {
-        checkGithubStatus();
-        
-        const handleMessage = (event: MessageEvent) => {
-            if (event.data?.type === 'GITHUB_AUTH_SUCCESS') {
-                checkGithubStatus();
-            }
-        };
-        window.addEventListener('message', handleMessage);
-        return () => window.removeEventListener('message', handleMessage);
-    }, []);
 
     useEffect(() => {
         if (mode === 'code' && data?.html) {
@@ -104,74 +84,26 @@ export default function DrawerContent({
         setIsRecommendedLoading(false);
     };
 
-    const checkGithubStatus = async () => {
-        try {
-            const res = await fetch('/api/github/status');
-            const data = await res.json();
-            setGithubConnected(data.connected);
-        } catch (e) {
-            console.error('Failed to check GitHub status', e);
-        }
+    const handleCopyFile = () => {
+        const content = exportedFiles[activeFile];
+        if (!content) return;
+        navigator.clipboard.writeText(content);
+        setFileCopyFeedback(true);
+        setTimeout(() => setFileCopyFeedback(false), 2000);
     };
 
-    const handleConnectGithub = async () => {
-        try {
-            const res = await fetch('/api/auth/github/url');
-            const { url } = await res.json();
-            if (url) {
-                window.open(url, 'github_oauth', 'width=600,height=700');
-            } else {
-                alert('GitHub Client ID not configured. Please check .env settings.');
-            }
-        } catch (e) {
-            console.error('Failed to get auth URL', e);
-            alert('Failed to initiate GitHub connection.');
-        }
-    };
-
-    const handleSaveToGithub = async () => {
-        if (!data?.html) return;
-        setIsSaving(true);
-        setSaveFeedback('');
-        try {
-            const res = await fetch('/api/github/save', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    type: saveType,
-                    content: data.html,
-                    files: exportedFiles,
-                    filename: activeFile || 'index.html',
-                    description: `Generated ${downloadFormat} export from Flash UI`,
-                    isPublic: true,
-                    repoName: repoNameInput || `flash-ui-${downloadFormat}-${Date.now()}`,
-                    branch: branchInput
-                })
-            });
-            
-            if (res.ok) {
-                const { url } = await res.json();
-                setSaveFeedback('Saved!');
-                window.open(url, '_blank');
-            } else {
-                const errData = await res.json();
-                setSaveFeedback(errData.error || 'Failed to save');
-            }
-        } catch (e) {
-            console.error('Save failed', e);
-            setSaveFeedback('Error saving');
-        } finally {
-            setIsSaving(false);
-            setTimeout(() => setSaveFeedback(''), 3000);
-        }
-    };
-
-    const handleCopyEmbed = () => {
-        if (!data?.html) return;
-        const embedCode = `<iframe srcdoc="${data.html.replace(/"/g, '&quot;')}" style="width:100%; height:500px; border:0; border-radius: 8px;"></iframe>`;
-        navigator.clipboard.writeText(embedCode);
-        setCopyFeedback(true);
-        setTimeout(() => setCopyFeedback(false), 2000);
+    const handleDownloadFile = () => {
+        const content = exportedFiles[activeFile];
+        if (!content) return;
+        const blob = new Blob([content], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = activeFile;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     };
 
     const handleExplain = async () => {
@@ -270,65 +202,6 @@ export default function DrawerContent({
                             >
                                 <BotIcon /> Explain
                             </button>
-                            {githubConnected ? (
-                                <div style={{display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end'}}>
-                                    <div style={{display: 'flex', gap: '4px'}}>
-                                        <select 
-                                            className="format-select" 
-                                            style={{paddingRight: '24px', fontSize: '0.8rem'}}
-                                            value={saveType}
-                                            onChange={(e) => setSaveType(e.target.value as any)}
-                                        >
-                                            <option value="gist">Gist</option>
-                                            <option value="repo">Repo</option>
-                                        </select>
-                                        <button 
-                                            className="download-code-btn" 
-                                            onClick={handleSaveToGithub}
-                                            disabled={isSaving}
-                                            title={saveType === 'gist' ? "Save as Gist" : "Save to Repo"}
-                                        >
-                                            <GithubIcon /> {isSaving ? 'Saving...' : (saveFeedback || (saveType === 'gist' ? 'Gist' : 'Repo'))}
-                                        </button>
-                                    </div>
-                                    {saveType === 'repo' && (
-                                        <div style={{display: 'flex', gap: '4px'}}>
-                                            <input 
-                                                type="text" 
-                                                className="assistant-input" 
-                                                style={{width: '120px', padding: '4px 8px', fontSize: '0.8rem'}}
-                                                placeholder="Repo Name" 
-                                                value={repoNameInput}
-                                                onChange={(e) => setRepoNameInput(e.target.value)}
-                                            />
-                                            <input 
-                                                type="text" 
-                                                className="assistant-input" 
-                                                style={{width: '80px', padding: '4px 8px', fontSize: '0.8rem'}}
-                                                placeholder="Branch" 
-                                                value={branchInput}
-                                                onChange={(e) => setBranchInput(e.target.value)}
-                                            />
-                                        </div>
-                                    )}
-                                </div>
-                            ) : (
-                                <button 
-                                    className="download-code-btn" 
-                                    onClick={handleConnectGithub}
-                                    title="Connect GitHub"
-                                >
-                                    <GithubIcon /> Connect
-                                </button>
-                            )}
-
-                            <button 
-                                className="download-code-btn" 
-                                onClick={handleCopyEmbed}
-                                title="Copy Embed Code"
-                            >
-                                <ShareIcon /> {copyFeedback ? 'Copied!' : 'Embed'}
-                            </button>
                             <button 
                                 className="download-code-btn" 
                                 onClick={() => downloadZip(data.html, downloadFormat)}
@@ -396,16 +269,36 @@ export default function DrawerContent({
                         </div>
                     )}
 
-                    <div className="file-tabs">
-                        {Object.keys(exportedFiles).map(filename => (
+                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px'}}>
+                        <div className="file-tabs" style={{marginBottom: 0}}>
+                            {Object.keys(exportedFiles).map(filename => (
+                                <button 
+                                    key={filename}
+                                    className={`file-tab ${activeFile === filename ? 'active' : ''}`}
+                                    onClick={() => setActiveFile(filename)}
+                                >
+                                    {filename}
+                                </button>
+                            ))}
+                        </div>
+                        <div style={{display: 'flex', gap: '8px'}}>
                             <button 
-                                key={filename}
-                                className={`file-tab ${activeFile === filename ? 'active' : ''}`}
-                                onClick={() => setActiveFile(filename)}
+                                className="file-tab" 
+                                onClick={handleCopyFile}
+                                title="Copy File Content"
+                                style={{display: 'flex', alignItems: 'center', gap: '4px'}}
                             >
-                                {filename}
+                                <CopyIcon /> {fileCopyFeedback ? 'Copied!' : 'Copy'}
                             </button>
-                        ))}
+                            <button 
+                                className="file-tab" 
+                                onClick={handleDownloadFile}
+                                title="Download File"
+                                style={{display: 'flex', alignItems: 'center', gap: '4px'}}
+                            >
+                                <DownloadIcon /> Download
+                            </button>
+                        </div>
                     </div>
 
                     <pre className="code-block"><code>{exportedFiles[activeFile]}</code></pre>

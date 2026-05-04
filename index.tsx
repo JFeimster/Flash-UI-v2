@@ -285,9 +285,6 @@ function App() {
              )}
 
             <div className={`action-bar ${focusedArtifactIndex !== null ? 'visible' : ''}`}>
-                 <div className="active-prompt-label">
-                    {currentSession?.prompt}
-                 </div>
                  <div className="action-buttons">
                     <button onClick={() => setFocusedArtifactIndex(null)}>
                         <GridIcon /> Grid View

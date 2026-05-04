@@ -18,7 +18,6 @@ interface SessionDeckProps {
     isLoading: boolean;
     onSurpriseMe: () => void;
     onRecommendationClick?: (prompt: string) => void;
-    onToggleFavorite?: (sessionId: string, artifactId: string) => void;
 }
 
 const RECOMMENDATIONS = [
@@ -37,12 +36,10 @@ export default function SessionDeck({
     hasStarted,
     isLoading,
     onSurpriseMe,
-    onRecommendationClick,
-    onToggleFavorite
+    onRecommendationClick
 }: SessionDeckProps) {
     const gridScrollRef = useRef<HTMLDivElement>(null);
     const [searchQuery, setSearchQuery] = useState('');
-    const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
     // Fix for mobile: reset scroll when focusing an item
     useEffect(() => {
@@ -63,10 +60,8 @@ export default function SessionDeck({
         }))
     ).filter(item => {
         const query = searchQuery.toLowerCase();
-        const matchesSearch = item.sessionPrompt.toLowerCase().includes(query) || 
+        return item.sessionPrompt.toLowerCase().includes(query) || 
                item.styleName.toLowerCase().includes(query);
-        const matchesFavorite = showFavoritesOnly ? item.isFavorite : true;
-        return matchesSearch && matchesFavorite;
     });
 
     return (
@@ -84,13 +79,6 @@ export default function SessionDeck({
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                          />
-                         <button 
-                            className={`favorite-filter-btn ${showFavoritesOnly ? 'active' : ''}`}
-                            onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
-                            title={showFavoritesOnly ? "Show All" : "Show Favorites Only"}
-                         >
-                             <SparklesIcon /> {/* Reusing Sparkles as Star alternative or just use text/icon */}
-                         </button>
                      </div>
                  </div>
              )}
@@ -121,8 +109,8 @@ export default function SessionDeck({
                  </div>
              </div>
 
-            {/* Search Results View OR Favorites View */}
-            {(searchQuery || showFavoritesOnly) ? (
+            {/* Search Results View */}
+            {searchQuery ? (
                 <div className="search-results-grid">
                     {filteredArtifacts.map((artifact) => (
                         <ArtifactCard 
@@ -130,12 +118,11 @@ export default function SessionDeck({
                             artifact={artifact}
                             isFocused={false} 
                             onClick={() => {}}
-                            onToggleFavorite={() => onToggleFavorite?.(artifact.sessionId, artifact.id)}
                         />
                     ))}
                     {filteredArtifacts.length === 0 && (
                         <div style={{ textAlign: 'center', color: 'var(--text-secondary)', gridColumn: '1/-1', marginTop: '40px' }}>
-                            {showFavoritesOnly ? "No favorites yet." : `No results found for "${searchQuery}"`}
+                            {`No results found for "${searchQuery}"`}
                         </div>
                     )}
                 </div>
@@ -159,7 +146,6 @@ export default function SessionDeck({
                                             artifact={artifact}
                                             isFocused={isFocused}
                                             onClick={() => setFocusedArtifactIndex(aIndex)}
-                                            onToggleFavorite={() => onToggleFavorite?.(session.id, artifact.id)}
                                         />
                                     );
                                 })}

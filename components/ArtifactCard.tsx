@@ -12,14 +12,12 @@ interface ArtifactCardProps {
     artifact: Artifact;
     isFocused: boolean;
     onClick: () => void;
-    onToggleFavorite?: (id: string) => void;
 }
 
 const ArtifactCard = React.memo(({ 
     artifact, 
     isFocused, 
-    onClick,
-    onToggleFavorite
+    onClick
 }: ArtifactCardProps) => {
     const codeRef = useRef<HTMLPreElement>(null);
     const [previewWidth, setPreviewWidth] = useState<'100%' | '768px' | '375px'>('100%');
@@ -38,11 +36,6 @@ const ArtifactCard = React.memo(({
 
     const isBlurring = artifact.status === 'streaming';
 
-    const handleFavoriteClick = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        onToggleFavorite?.(artifact.id);
-    };
-
     return (
         <div 
             className={`artifact-card ${isFocused ? 'focused' : ''} ${isBlurring ? 'generating' : ''}`}
@@ -50,13 +43,6 @@ const ArtifactCard = React.memo(({
         >
             <div className="artifact-header">
                 <span className="artifact-style-tag">{artifact.styleName}</span>
-                <button 
-                    className={`favorite-button ${artifact.isFavorite ? 'active' : ''}`}
-                    onClick={handleFavoriteClick}
-                    title={artifact.isFavorite ? "Remove from favorites" : "Add to favorites"}
-                >
-                    {artifact.isFavorite ? <StarFilledIcon /> : <StarIcon />}
-                </button>
             </div>
             
             <div className="artifact-card-inner">

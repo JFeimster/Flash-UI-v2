@@ -446,12 +446,14 @@ html, body {
     border: none;
     color: var(--text-secondary);
     cursor: pointer;
-    padding: 8px;
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: all 0.2s ease;
+    flex-shrink: 0;
 }
 
 .attachment-button:hover {
@@ -471,6 +473,7 @@ html, body {
     align-items: center;
     width: 100%;
     padding-right: 8px;
+    gap: 8px;
 }
 
 .reset-button:hover {
@@ -976,14 +979,14 @@ html, body {
     background: transparent;
     border: none;
     color: var(--text-secondary);
-    padding: 8px;
+    width: 40px;
+    height: 40px;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     border-radius: 50%;
     transition: all 0.2s;
-    margin-right: 0;
     flex-shrink: 0;
 }
 .layout-button:hover:not(:disabled) {
@@ -997,7 +1000,7 @@ html, body {
 
 .animated-placeholder {
     position: absolute;
-    left: 56px;
+    left: 108px;
     color: var(--text-secondary);
     opacity: 0.7;
     pointer-events: none;
@@ -1076,22 +1079,25 @@ html, body {
 /* === Action Bar === */
 .action-bar {
     position: absolute;
-    bottom: 100px;
+    bottom: 220px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
     display: flex; flex-direction: column; align-items: center; gap: 12px;
-    opacity: 0; transform: translateY(20px);
+    opacity: 0;
     transition: all 0.4s ease-out 0.2s;
     z-index: 110;
     pointer-events: none;
+    width: 100%;
+    max-width: 800px;
 }
-.action-bar.visible { opacity: 1; transform: translateY(0); }
-.active-prompt-label {
-    color: var(--text-secondary); font-size: 0.9rem;
-    background: rgba(0,0,0,0.5); padding: 6px 12px; border-radius: 20px;
-    max-width: 600px;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    backdrop-filter: blur(8px); pointer-events: auto;
+.action-bar.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+.action-buttons { 
+    display: flex; 
+    gap: 12px; 
+    pointer-events: auto; 
+    flex-wrap: wrap; 
+    justify-content: center; 
 }
-.action-buttons { display: flex; gap: 12px; pointer-events: auto; }
 .action-buttons button {
     background: var(--input-bg);
     border: 1px solid var(--border-color);
@@ -1554,7 +1560,7 @@ html, body {
         transform: translate(-50%, -40%) !important;
     }
 
-    .action-bar { bottom: 90px; width: 100%; gap: 8px; }
+    .action-bar { bottom: 180px; width: 100%; gap: 8px; }
     .action-buttons { flex-wrap: wrap; justify-content: center; }
     .floating-input-container { padding: 0 10px; bottom: 20px; }
     .sexy-preview { height: 160px; }
