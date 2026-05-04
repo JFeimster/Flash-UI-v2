@@ -278,11 +278,12 @@ function App() {
         </SideDrawer>
 
         <div className="immersive-app">
+            <div className="scanline"></div>
             <DottedGlowBackground 
                 gap={24} 
                 radius={1.5} 
                 color="rgba(255, 255, 255, 0.02)" 
-                glowColor="rgba(255, 255, 255, 0.15)" 
+                glowColor="rgba(107, 33, 255, 0.4)" 
                 speedScale={0.5} 
             />
 

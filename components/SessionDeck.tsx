@@ -86,8 +86,8 @@ export default function SessionDeck({
              {/* Empty State */}
              <div className={`empty-state ${hasStarted ? 'fade-out' : ''}`}>
                  <div className="empty-content">
-                     <h1>Flash UI</h1>
-                     <p>Creative UI generation in a flash</p>
+                     <h1 data-text="FLASH UI" className="glitch-hover">FLASH UI</h1>
+                     <p style={{fontFamily: 'var(--font-mono)', fontSize: '0.9rem', letterSpacing: '4px', opacity: 0.6, textShadow: '0 0 10px var(--neon-glow)'}}>CORE_ENGINE_v1.0</p>
                      
                      <div className="recommendations-grid">
                         {RECOMMENDATIONS.map((rec, i) => (

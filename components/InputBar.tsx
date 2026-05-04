@@ -127,7 +127,7 @@ export default function InputBar({
             <div className="input-bar-container">
                 {suggestions.length > 0 && !isLoading && (
                     <div className="suggestions-row" style={{marginBottom: '4px'}}>
-                        <div className="suggestions-label" style={{fontFamily: 'Roboto Mono, monospace', fontSize: '10px'}}>
+                        <div className="suggestions-label" style={{fontFamily: 'var(--font-mono)', fontSize: '10px'}}>
                             <SparklesIcon /> SUGGESTED_MODES:
                         </div>
                         {suggestions.map((s, i) => (
@@ -214,7 +214,7 @@ export default function InputBar({
 
                     <div className="input-actions">
                         <button 
-                            className="technical-btn" 
+                            className="technical-btn glitch-hover" 
                             onClick={handleSend} 
                             disabled={isLoading || (!inputValue.trim() && attachments.length === 0)}
                         >
