@@ -49,6 +49,15 @@ export default function DrawerContent({
     const [hasManuallySelected, setHasManuallySelected] = useState(false);
     const [fileCopyFeedback, setFileCopyFeedback] = useState(false);
 
+    // GitHub state
+    const [githubConnected, setGithubConnected] = useState<boolean | null>(null);
+    const [isDeploying, setIsDeploying] = useState(false);
+    const [deploymentResult, setDeploymentResult] = useState<{ url: string, name: string } | null>(null);
+    const [showGithubModal, setShowGithubModal] = useState(false);
+    const [repoName, setRepoName] = useState('');
+    const [repoDescription, setRepoDescription] = useState('');
+    const [isPrivate, setIsPrivate] = useState(false);
+
     const formats = [
         { id: 'static', label: 'Static HTML', desc: 'Direct browser use' },
         { id: 'nextjs', label: 'Next.js', desc: 'Modern App Router' },
@@ -132,6 +141,73 @@ export default function DrawerContent({
     const [exportedFiles, setExportedFiles] = useState<ExportedFiles>({});
 
     const isLoadingVariations = isLoading && mode === 'variations' && componentVariations.length === 0;
+
+    useEffect(() => {
+        if (mode === 'code') {
+            checkGithubStatus();
+        }
+    }, [mode]);
+
+    useEffect(() => {
+        const handleMessage = (event: MessageEvent) => {
+            if (event.data?.type === 'OAUTH_AUTH_SUCCESS' && event.data?.provider === 'github') {
+                setGithubConnected(true);
+            }
+        };
+        window.addEventListener('message', handleMessage);
+        return () => window.removeEventListener('message', handleMessage);
+    }, []);
+
+    const checkGithubStatus = async () => {
+        try {
+            const res = await fetch('/api/github/status');
+            const data = await res.json();
+            setGithubConnected(data.connected);
+        } catch (e) {
+            setGithubConnected(false);
+        }
+    };
+
+    const handleGithubConnect = async () => {
+        try {
+            const res = await fetch('/api/auth/github/url');
+            const { url } = await res.json();
+            window.open(url, 'github_oauth', 'width=600,height=700');
+        } catch (e) {
+            console.error('Failed to get GitHub auth URL');
+        }
+    };
+
+    const handleDeploy = async () => {
+        if (!repoName.trim() || !data?.html) return;
+        setIsDeploying(true);
+        setDeploymentResult(null);
+
+        try {
+            const res = await fetch('/api/github/deploy', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    repoName: repoName.trim(),
+                    description: repoDescription,
+                    files: exportedFiles,
+                    isPrivate
+                })
+            });
+
+            const result = await res.json();
+            if (result.success) {
+                setDeploymentResult({ url: result.url, name: result.fullName });
+                setShowGithubModal(false);
+            } else {
+                alert(result.error || 'Failed to deploy to GitHub');
+            }
+        } catch (e) {
+            alert('An error occurred during deployment.');
+        } finally {
+            setIsDeploying(false);
+        }
+    };
 
     useEffect(() => {
         if (mode === 'code' && data?.html) {
@@ -316,8 +392,76 @@ export default function DrawerContent({
                             >
                                 <DownloadIcon /> Zip
                             </button>
+                            <button 
+                                className={`download-code-btn github-btn ${githubConnected ? 'active' : ''}`}
+                                onClick={githubConnected ? () => setShowGithubModal(true) : handleGithubConnect}
+                                title={githubConnected ? "Deploy to GitHub" : "Connect GitHub"}
+                            >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                                {githubConnected ? 'Deploy' : 'Connect'}
+                            </button>
                         </div>
                     </div>
+
+                    {showGithubModal && (
+                        <div className="github-modal-overlay" onClick={() => setShowGithubModal(false)}>
+                            <div className="github-modal" onClick={e => e.stopPropagation()}>
+                                <div className="github-modal-header">
+                                    <h3>Deploy to GitHub</h3>
+                                    <button onClick={() => setShowGithubModal(false)}>×</button>
+                                </div>
+                                <div className="github-modal-content">
+                                    <div className="input-group">
+                                        <label>Repository Name</label>
+                                        <input 
+                                            type="text" 
+                                            value={repoName} 
+                                            onChange={e => setRepoName(e.target.value.replace(/[^a-zA-Z0-9._-]/g, '-'))}
+                                            placeholder="my-awesome-project"
+                                        />
+                                    </div>
+                                    <div className="input-group">
+                                        <label>Description (Optional)</label>
+                                        <textarea 
+                                            value={repoDescription} 
+                                            onChange={e => setRepoDescription(e.target.value)}
+                                            placeholder="A beautiful web component generated by Flash UI"
+                                        />
+                                    </div>
+                                    <div className="checkbox-group">
+                                        <label>
+                                            <input 
+                                                type="checkbox" 
+                                                checked={isPrivate} 
+                                                onChange={e => setIsPrivate(e.target.checked)}
+                                            />
+                                            Private Repository
+                                        </label>
+                                    </div>
+                                    <button 
+                                        className="deploy-submit-btn" 
+                                        onClick={handleDeploy}
+                                        disabled={isDeploying || !repoName.trim()}
+                                    >
+                                        {isDeploying ? 'Deploying...' : 'Push to GitHub'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {deploymentResult && (
+                        <div className="deployment-success-banner">
+                            <div className="success-content">
+                                <SparklesIcon />
+                                <div>
+                                    <strong>Success!</strong> Deployed to <span>{deploymentResult.name}</span>
+                                </div>
+                            </div>
+                            <a href={deploymentResult.url} target="_blank" rel="noreferrer" className="view-repo-link">View Repo</a>
+                            <button className="close-banner" onClick={() => setDeploymentResult(null)}>×</button>
+                        </div>
+                    )}
 
                     {assistantMode === 'refactor' && (
                         <div className="assistant-panel">

@@ -1696,5 +1696,336 @@ html, body {
     .floating-input-container { padding: 0 10px; bottom: 20px; }
     .sexy-preview { height: 160px; }
     .sexy-preview iframe { width: 1000px; height: 640px; transform: scale(0.16); }
-    .surprise-button { padding: 10px 18px; font-size: 0.9rem; }
 }
+
+/* === GitHub Deployment UI === */
+.github-btn {
+    background: #24292e !important; /* GitHub dark color */
+    color: white !important;
+    gap: 8px;
+    display: flex;
+    align-items: center;
+}
+.github-btn:hover {
+    background: #2c3238 !important;
+}
+.github-btn.active {
+    background: #2ea44e !important; /* GitHub green */
+}
+
+.github-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(8px);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    animation: fadeIn 0.2s ease;
+}
+
+.github-modal {
+    background: #0d1117; /* GitHub dark theme */
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    width: 100%;
+    max-width: 450px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    animation: scaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.github-modal-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid #30363d;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.github-modal-header h3 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #c9d1d9;
+}
+
+.github-modal-header button {
+    background: transparent;
+    border: none;
+    color: #8b949e;
+    font-size: 1.5rem;
+    cursor: pointer;
+}
+
+.github-modal-content {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.input-group label {
+    font-size: 0.85rem;
+    color: #8b949e;
+    font-weight: 500;
+}
+
+.input-group input, 
+.input-group textarea {
+    background: #010409;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 10px;
+    color: #c9d1d9;
+    font-family: var(--font-sans);
+    outline: none;
+}
+
+.input-group input:focus, 
+.input-group textarea:focus {
+    border-color: #58a6ff;
+    box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1);
+}
+
+.checkbox-group label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #c9d1d9;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.deploy-submit-btn {
+    background: #238636;
+    color: white;
+    border: 1px solid rgba(240,246,252,0.1);
+    border-radius: 6px;
+    padding: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+    margin-top: 8px;
+}
+
+.deploy-submit-btn:hover:not(:disabled) {
+    background: #2ea043;
+}
+
+.deploy-submit-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.deployment-success-banner {
+    background: #161b22;
+    border: 1px solid #238636;
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    animation: slideInDown 0.4s ease;
+}
+
+.success-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #c9d1d9;
+    font-size: 0.9rem;
+}
+
+.success-content strong {
+    color: #3fb950;
+}
+
+.success-content span {
+    font-family: 'Roboto Mono', monospace;
+    background: #0d1117;
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid #30363d;
+}
+
+.view-repo-link {
+    color: #58a6ff;
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.view-repo-link:hover {
+    text-decoration: underline;
+}
+
+.close-banner {
+    background: transparent;
+    border: none;
+    color: #8b949e;
+    cursor: pointer;
+    font-size: 1.2rem;
+}
+
+@keyframes slideInDown {
+    from { transform: translateY(-20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+/* === Optimized Input Dashboard === */
+.input-dashboard-wrapper {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background: var(--app-bg);
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+}
+
+.control-strip {
+    display: flex;
+    align-items: center;
+    padding: 8px 24px;
+    border-bottom: 1px dotted var(--border-color);
+    gap: 24px;
+}
+
+.status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Roboto Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-secondary);
+}
+
+.status-indicator .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #22c55e;
+    box-shadow: 0 0 6px #22c55e;
+}
+
+.status-indicator.loading .dot {
+    background: #eab308;
+    box-shadow: 0 0 6px #eab308;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.4; }
+    100% { opacity: 1; }
+}
+
+.dashboard-labels {
+    display: flex;
+    gap: 16px;
+    margin-left: auto;
+}
+
+.mini-label {
+    font-family: 'Georgia', serif;
+    font-style: italic;
+    font-size: 11px;
+    opacity: 0.5;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Overriding old InputBar styles for the new Dashboard look */
+.input-bar-container {
+    width: 100%;
+    padding: 16px 24px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.input-dashboard-main {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 16px;
+    align-items: flex-end;
+}
+
+.styled-input-wrapper {
+    background: var(--accent-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 12px 16px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    transition: all 0.2s;
+}
+
+.styled-input-wrapper:focus-within {
+    border-color: var(--accent-color);
+    background: #000;
+}
+
+.styled-input {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #fff;
+    font-size: 1rem;
+    flex: 1;
+    font-family: var(--font-sans);
+}
+
+.input-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.technical-btn {
+    background: #fff;
+    color: #000;
+    border: none;
+    border-radius: 4px;
+    padding: 10px 20px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.technical-btn:hover:not(:disabled) {
+    background: #ccc;
+    transform: translateY(-1px);
+}
+
+.technical-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.technical-btn.secondary {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: #fff;
+}
+
+.technical-btn.secondary:hover {
+    background: var(--border-color);
+}
+

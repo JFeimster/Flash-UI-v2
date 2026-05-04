@@ -112,30 +112,42 @@ export default function InputBar({
     };
 
     return (
-        <div className="floating-input-container">
-            {suggestions.length > 0 && !isLoading && (
-                <div className="suggestions-row">
-                    <div className="suggestions-label">
-                        <SparklesIcon /> Suggested:
-                    </div>
-                    {suggestions.map((s, i) => (
-                        <button 
-                            key={i} 
-                            className="suggestion-chip"
-                            onClick={() => onSuggestionClick(s)}
-                        >
-                            <span className="suggestion-icon">{s.icon}</span>
-                            <span className="suggestion-name">{s.name}</span>
-                        </button>
-                    ))}
+        <div className="input-dashboard-wrapper">
+            <div className="control-strip">
+                <div className={`status-indicator ${isLoading ? 'loading' : ''}`}>
+                    <div className="dot" />
+                    <span>{isLoading ? 'System Processing...' : 'System Ready'}</span>
                 </div>
-            )}
-            <div className={`input-wrapper ${isLoading ? 'loading' : ''} ${attachments.length > 0 ? 'has-attachments' : ''}`}>
-                
+                <div className="dashboard-labels">
+                    <div className="mini-label">Session: LIVE_NODE_01</div>
+                    <div className="mini-label">Vibe: MAX_CREATIVE</div>
+                </div>
+            </div>
+
+            <div className="input-bar-container">
+                {suggestions.length > 0 && !isLoading && (
+                    <div className="suggestions-row" style={{marginBottom: '4px'}}>
+                        <div className="suggestions-label" style={{fontFamily: 'Roboto Mono, monospace', fontSize: '10px'}}>
+                            <SparklesIcon /> SUGGESTED_MODES:
+                        </div>
+                        {suggestions.map((s, i) => (
+                            <button 
+                                key={i} 
+                                className="suggestion-chip"
+                                onClick={() => onSuggestionClick(s)}
+                                style={{borderRadius: '4px', textTransform: 'uppercase', fontSize: '10px'}}
+                            >
+                                <span className="suggestion-icon">{s.icon}</span>
+                                <span className="suggestion-name">{s.name}</span>
+                            </button>
+                        ))}
+                    </div>
+                )}
+
                 {attachments.length > 0 && (
-                    <div className="attachment-preview-list">
+                    <div className="attachment-preview-list" style={{padding: '0 0 12px 0'}}>
                         {attachments.map((att, i) => (
-                            <div key={i} className="attachment-preview">
+                            <div key={i} className="attachment-preview" style={{width: '60px', height: '60px', borderRadius: '4px'}}>
                                 <img src={`data:${att.mimeType};base64,${att.data}`} alt="attachment" />
                                 <button className="attachment-remove" onClick={() => removeAttachment(i)}>
                                     <XIcon />
@@ -145,56 +157,70 @@ export default function InputBar({
                     </div>
                 )}
 
-                <div className="input-row">
-                    <button 
-                        className="layout-button" 
-                        onClick={onTemplateClick}
-                        disabled={isLoading}
-                        title="Templates"
-                    >
-                        <LayoutIcon />
-                    </button>
+                <div className="input-dashboard-main">
+                    <div className="styled-input-wrapper">
+                        <button 
+                            className="layout-button" 
+                            onClick={onTemplateClick}
+                            disabled={isLoading}
+                            style={{color: 'rgba(255,255,255,0.4)'}}
+                        >
+                            <LayoutIcon />
+                        </button>
 
-                    <button 
-                        className="attachment-button"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={isLoading}
-                        title="Add Image"
-                    >
-                        <AttachmentIcon />
-                    </button>
-                    <input 
-                        type="file" 
-                        ref={fileInputRef} 
-                        style={{ display: 'none' }} 
-                        accept="image/*" 
-                        onChange={handleFileSelect}
-                    />
-
-                    {(!inputValue && !isLoading && attachments.length === 0) && (
-                        <div className="animated-placeholder" key={placeholderIndex}>
-                            <span className="placeholder-text">{placeholders[placeholderIndex]}</span>
-                            <span className="tab-hint">Tab</span>
-                        </div>
-                    )}
-                    {!isLoading ? (
+                        <button 
+                            className="attachment-button"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isLoading}
+                            style={{color: 'rgba(255,255,255,0.4)', padding: 0, width: 'auto'}}
+                        >
+                            <AttachmentIcon />
+                        </button>
                         <input 
-                            ref={inputRef}
-                            type="text" 
-                            value={inputValue} 
-                            onChange={(e) => setInputValue(e.target.value)} 
-                            onKeyDown={handleKeyDown} 
-                            disabled={isLoading} 
+                            type="file" 
+                            ref={fileInputRef} 
+                            style={{ display: 'none' }} 
+                            accept="image/*" 
+                            onChange={handleFileSelect}
                         />
-                    ) : (
-                        <div className="input-generating-label">
-                            <span className="generating-prompt-text">{currentPrompt}</span>
-                            <ThinkingIcon />
+
+                        <div style={{position: 'relative', flex: 1, display: 'flex', alignItems: 'center'}}>
+                            {(!inputValue && !isLoading && attachments.length === 0) && (
+                                <div className="animated-placeholder" key={placeholderIndex} style={{position: 'absolute', left: 0, pointerEvents: 'none', background: 'transparent', width: '100%'}}>
+                                    <span className="placeholder-text" style={{fontSize: '0.9rem', color: 'rgba(255,255,255,0.2)'}}>{placeholders[placeholderIndex]}</span>
+                                    <span className="tab-hint" style={{marginLeft: 'auto', fontSize: '9px', padding: '2px 4px'}}>Tab</span>
+                                </div>
+                            )}
+                            
+                            {!isLoading ? (
+                                <input 
+                                    ref={inputRef}
+                                    type="text" 
+                                    className="styled-input"
+                                    value={inputValue} 
+                                    onChange={(e) => setInputValue(e.target.value)} 
+                                    onKeyDown={handleKeyDown} 
+                                    disabled={isLoading} 
+                                    placeholder=""
+                                />
+                            ) : (
+                                <div className="input-generating-label" style={{background: 'transparent', padding: 0, width: '100%'}}>
+                                    <span className="generating-prompt-text" style={{color: 'rgba(255,255,255,0.5)'}}>{currentPrompt}</span>
+                                    <ThinkingIcon />
+                                </div>
+                            )}
                         </div>
-                    )}
-                    <button className="send-button" onClick={handleSend} disabled={isLoading || (!inputValue.trim() && attachments.length === 0)}>
-                        <ArrowUpIcon />
-                    </button>
+                    </div>
+
+                    <div className="input-actions">
+                        <button 
+                            className="technical-btn" 
+                            onClick={handleSend} 
+                            disabled={isLoading || (!inputValue.trim() && attachments.length === 0)}
+                        >
+                            <ArrowUpIcon /> {isLoading ? 'BUSY' : 'EXECUTE'}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
