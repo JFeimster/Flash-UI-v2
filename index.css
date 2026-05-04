@@ -1176,7 +1176,94 @@ html, body {
 }
 .sexy-card:hover .sexy-label { color: #fff; background: rgba(255,255,255,0.05); }
 .code-display-wrapper { display: flex; flex-direction: column; gap: 16px; }
-.code-header-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.format-selector-wrapper {
+    margin-bottom: 20px;
+    background: rgba(255, 255, 255, 0.02);
+    padding: 16px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.format-label-row {
+    margin-bottom: 12px;
+}
+
+.format-label-row label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.format-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 10px;
+}
+
+.format-btn {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    padding: 10px;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.format-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.format-btn.active {
+    background: rgba(138, 43, 226, 0.1);
+    border-color: var(--accent-color);
+    box-shadow: 0 0 15px rgba(138, 43, 226, 0.05);
+}
+
+.format-btn.recommended {
+    border-color: rgba(16, 185, 129, 0.2);
+    background: rgba(16, 185, 129, 0.02);
+}
+
+.format-name {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+}
+
+.format-desc {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    line-height: 1.2;
+    opacity: 0.8;
+}
+
+.rec-badge {
+    background: #10b981;
+    color: #000;
+    font-size: 0.55rem;
+    padding: 1px 4px;
+    border-radius: 4px;
+    font-weight: 800;
+    text-transform: uppercase;
+    flex-shrink: 0;
+}
+
+.code-header-actions {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
 
 .format-select {
     background: rgba(255, 255, 255, 0.1); border: 1px solid var(--glass-border);

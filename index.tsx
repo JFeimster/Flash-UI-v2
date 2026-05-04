@@ -151,7 +151,8 @@ function App() {
                   html: artifact.html, 
                   additionalFiles: artifact.additionalFiles,
                   sessionId: currentSession.id, 
-                  artifactId: artifact.id 
+                  artifactId: artifact.id,
+                  prompt: currentSession.prompt
               } 
           });
       }
@@ -168,7 +169,8 @@ function App() {
                   html: artifact.html, 
                   additionalFiles: artifact.additionalFiles,
                   sessionId: currentSession.id, 
-                  artifactId: artifact.id 
+                  artifactId: artifact.id,
+                  prompt: currentSession.prompt
               } 
           });
       }

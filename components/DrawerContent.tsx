@@ -45,7 +45,73 @@ export default function DrawerContent({
     onUpdateArtifactFiles
 }: DrawerContentProps) {
     const [downloadFormat, setDownloadFormat] = useState<'static' | 'nextjs' | 'wix' | 'notion' | 'react' | 'vue' | 'svelte'>('static');
+    const [recommendedFormat, setRecommendedFormat] = useState<string>('');
+    const [hasManuallySelected, setHasManuallySelected] = useState(false);
     const [fileCopyFeedback, setFileCopyFeedback] = useState(false);
+
+    const formats = [
+        { id: 'static', label: 'Static HTML', desc: 'Direct browser use' },
+        { id: 'nextjs', label: 'Next.js', desc: 'Modern App Router' },
+        { id: 'react', label: 'React', desc: 'Best Single Component' },
+        { id: 'vue', label: 'Vue', desc: 'SFC Version' },
+        { id: 'svelte', label: 'Svelte', desc: 'Reactive Component' },
+        { id: 'wix', label: 'Wix Velo', desc: 'For Wix Sites' },
+        { id: 'notion', label: 'Notion', desc: 'Markdown Embed' },
+    ];
+
+    useEffect(() => {
+        if (data?.html) {
+            const htmlContent = data.html.toLowerCase();
+            const promptContent = (data.prompt || '').toLowerCase();
+            let rec = 'static';
+
+            // 1. Explicit Prompt Hooks (User intentions override heuristics)
+            if (promptContent.includes('next.js') || promptContent.includes('nextjs')) rec = 'nextjs';
+            else if (promptContent.includes('wix')) rec = 'wix';
+            else if (promptContent.includes('notion')) rec = 'notion';
+            else if (promptContent.includes('react')) rec = 'react';
+            else if (promptContent.includes('vue')) rec = 'vue';
+            else if (promptContent.includes('svelte')) rec = 'svelte';
+            
+            // 2. Code-based heuristics
+            else if (htmlContent.includes('framer-motion') || htmlContent.includes('motion.')) {
+                rec = 'nextjs';
+            } 
+            else if (htmlContent.includes('###') || (htmlContent.trim().startsWith('#') && !htmlContent.includes('<div'))) {
+                rec = 'notion';
+            }
+            else if (htmlContent.includes('v-if') || htmlContent.includes('v-for')) {
+                rec = 'vue';
+            }
+            else if (htmlContent.includes('class=') && data.html.length > 5000) {
+                // Large complex pages are best as Next.js projects
+                rec = 'nextjs';
+            }
+            else if (htmlContent.includes('lucide') || (htmlContent.includes('<button') && htmlContent.includes('onClick'))) {
+                // Interactive components with logic
+                rec = 'react';
+            }
+            else if (htmlContent.includes('<section') && data.html.length < 2500) {
+                // Small sections are great for Wix Velo embedding
+                rec = 'wix';
+            }
+            else if (htmlContent.includes('<html') || htmlContent.includes('<!doctype')) {
+                // Full standalone documents
+                rec = 'static';
+            }
+            else {
+                // Default to React for snippets
+                rec = 'react';
+            }
+
+            setRecommendedFormat(rec);
+            
+            // Auto-set the download format to the recommended one if user hasn't touched it
+            if (!hasManuallySelected) {
+                setDownloadFormat(rec as any);
+            }
+        }
+    }, [data?.html, data?.prompt]);
     
     // AI Assistant state
     const [assistantMode, setAssistantMode] = useState<'none' | 'explain' | 'refactor'>('none');
@@ -203,23 +269,34 @@ export default function DrawerContent({
 
             {mode === 'code' && (
                 <div className="code-display-wrapper">
+                    <div className="format-selector-wrapper">
+                        <div className="format-label-row">
+                            <label>Export Format:</label>
+                        </div>
+                        <div className="format-grid">
+                            {formats.map((f) => (
+                                <button
+                                    key={f.id}
+                                    className={`format-btn ${downloadFormat === f.id ? 'active' : ''} ${recommendedFormat === f.id ? 'recommended' : ''}`}
+                                    onClick={() => {
+                                        setDownloadFormat(f.id as any);
+                                        setHasManuallySelected(true);
+                                    }}
+                                >
+                                    <div className="format-name">
+                                        {f.label}
+                                        {recommendedFormat === f.id && <span className="rec-badge">Best</span>}
+                                    </div>
+                                    <div className="format-desc">{f.desc}</div>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
                     <div className="code-header-actions">
-                        <select 
-                            className="format-select" 
-                            value={downloadFormat} 
-                            onChange={(e) => setDownloadFormat(e.target.value as any)}
-                        >
-                            <option value="static">Static (HTML/CSS/JS)</option>
-                            <option value="nextjs">Next.js (App Router)</option>
-                            <option value="react">React (TSX)</option>
-                            <option value="vue">Vue</option>
-                            <option value="svelte">Svelte</option>
-                            <option value="wix">Wix (Velo)</option>
-                            <option value="notion">Notion (Markdown)</option>
-                        </select>
-                        <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end'}}>
+                        <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-start', width: '100%'}}>
                             <button 
-                                className="download-code-btn assistant-btn" 
+                                className={`download-code-btn assistant-btn ${assistantMode === 'refactor' ? 'active' : ''}`} 
                                 onClick={() => setAssistantMode(assistantMode === 'refactor' ? 'none' : 'refactor')}
                                 title="AI Refactor"
                             >
