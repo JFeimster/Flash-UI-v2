@@ -52,6 +52,7 @@ function App() {
     sendMessage, 
     generateVariations, 
     updateSessionArtifact,
+    updateSessionArtifactFiles,
     setComponentVariations,
     resetSessions,
     toggleFavorite,
@@ -59,7 +60,8 @@ function App() {
     refactorCode,
     generateRecommendedPages,
     applyAnimation,
-    suggestComponents
+    suggestComponents,
+    generateAdditionalFile
   } = useGenAI();
 
   const {
@@ -147,6 +149,7 @@ function App() {
               title: 'Source Code', 
               data: { 
                   html: artifact.html, 
+                  additionalFiles: artifact.additionalFiles,
                   sessionId: currentSession.id, 
                   artifactId: artifact.id 
               } 
@@ -163,11 +166,28 @@ function App() {
               title: 'Recommended Pages', 
               data: { 
                   html: artifact.html, 
+                  additionalFiles: artifact.additionalFiles,
                   sessionId: currentSession.id, 
                   artifactId: artifact.id 
               } 
           });
       }
+  };
+
+  const handleUpdateArtifactFiles = (sessionId: string, artifactId: string, files: Record<string, string>) => {
+      updateSessionArtifactFiles(sessionId, artifactId, files);
+      setDrawerState(prev => {
+          if (prev.data?.sessionId === sessionId && prev.data?.artifactId === artifactId) {
+              return {
+                  ...prev,
+                  data: {
+                      ...prev.data,
+                      additionalFiles: { ...(prev.data.additionalFiles || {}), ...files }
+                  }
+              };
+          }
+          return prev;
+      });
   };
 
   const handleShowAnimations = () => {
@@ -243,10 +263,12 @@ function App() {
                 refactorCode={refactorCode}
                 generateRecommendedPages={generateRecommendedPages}
                 applyAnimation={applyAnimation}
+                generateAdditionalFile={generateAdditionalFile}
+                onUpdateArtifactFiles={handleUpdateArtifactFiles}
                 onRefactorApply={(newHtml) => {
                     if (focusedArtifactIndex !== null) {
                         updateSessionArtifact(currentSessionIndex, focusedArtifactIndex, newHtml);
-                        setDrawerState(s => ({ ...s, data: newHtml }));
+                        setDrawerState(s => ({ ...s, data: { ...s.data, html: newHtml } }));
                     }
                 }}
                 onSwitchMode={(newMode) => setDrawerState(s => ({ ...s, mode: newMode, title: newMode === 'recommended' ? 'Recommended Pages' : 'Source Code' }))}

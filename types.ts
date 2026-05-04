@@ -9,6 +9,7 @@ export interface Artifact {
   html: string;
   status: 'streaming' | 'complete' | 'error';
   isFavorite?: boolean;
+  additionalFiles?: Record<string, string>;
 }
 
 export interface Session {

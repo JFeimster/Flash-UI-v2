@@ -1335,17 +1335,61 @@ html, body {
     padding: 0;
     margin: 0;
     display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
+    flex-direction: column;
+    gap: 12px;
 }
 
-.structure-list li {
+.structure-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.file-name {
     font-family: 'Roboto Mono', monospace;
-    font-size: 0.75rem;
+    font-size: 0.8rem;
     color: #fff;
-    background: rgba(255, 255, 255, 0.1);
+    opacity: 0.9;
+}
+
+.generate-file-btn {
+    background: var(--accent-color);
+    color: #000;
+    border: none;
+    padding: 4px 12px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.generate-file-btn:hover:not(:disabled) {
+    transform: scale(1.05);
+    background: #fff;
+}
+
+.generate-file-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: rgba(255, 255, 255, 0.2);
+    color: var(--text-secondary);
+}
+
+.generated-tag {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #10b981;
+    background: rgba(16, 185, 129, 0.1);
     padding: 2px 8px;
     border-radius: 4px;
+    text-transform: uppercase;
 }
 
 .code-block.mini {

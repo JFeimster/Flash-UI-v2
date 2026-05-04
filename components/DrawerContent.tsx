@@ -24,6 +24,8 @@ interface DrawerContentProps {
     generateRecommendedPages?: (sessionId: string, artifactId: string) => Promise<RecommendedPage[]>;
     onSwitchMode?: (mode: 'code' | 'recommended') => void;
     applyAnimation?: (code: string, animationPrompt: string) => Promise<string | undefined>;
+    generateAdditionalFile?: (baseHtml: string, filename: string, description: string) => Promise<string>;
+    onUpdateArtifactFiles?: (sessionId: string, artifactId: string, files: Record<string, string>) => void;
 }
 
 export default function DrawerContent({
@@ -38,7 +40,9 @@ export default function DrawerContent({
     onRefactorApply,
     generateRecommendedPages,
     onSwitchMode,
-    applyAnimation
+    applyAnimation,
+    generateAdditionalFile,
+    onUpdateArtifactFiles
 }: DrawerContentProps) {
     const [downloadFormat, setDownloadFormat] = useState<'static' | 'nextjs' | 'wix' | 'notion' | 'react' | 'vue' | 'svelte'>('static');
     const [fileCopyFeedback, setFileCopyFeedback] = useState(false);
@@ -58,15 +62,18 @@ export default function DrawerContent({
 
     // Multi-file state
     const [activeFile, setActiveFile] = useState<string>('');
+    const [generatingFiles, setGeneratingFiles] = useState<Set<string>>(new Set());
     const [exportedFiles, setExportedFiles] = useState<ExportedFiles>({});
 
     const isLoadingVariations = isLoading && mode === 'variations' && componentVariations.length === 0;
 
     useEffect(() => {
         if (mode === 'code' && data?.html) {
-            const files = getExportedFiles(data.html, downloadFormat);
+            const files = getExportedFiles(data.html, downloadFormat, data.additionalFiles);
             setExportedFiles(files);
-            setActiveFile(Object.keys(files)[0]);
+            if (!activeFile || !files[activeFile]) {
+                setActiveFile(Object.keys(files)[0]);
+            }
         }
     }, [mode, data, downloadFormat]);
 
@@ -104,6 +111,29 @@ export default function DrawerContent({
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+    };
+
+    const handleGeneratePageFile = async (filename: string, description: string) => {
+        if (!generateAdditionalFile || !onUpdateArtifactFiles || !data?.html) return;
+        
+        setGeneratingFiles(prev => {
+            const next = new Set(prev);
+            next.add(filename);
+            return next;
+        });
+
+        try {
+            const fileContent = await generateAdditionalFile(data.html, filename, description);
+            if (fileContent) {
+                onUpdateArtifactFiles(data.sessionId, data.artifactId, { [filename]: fileContent });
+            }
+        } finally {
+            setGeneratingFiles(prev => {
+                const next = new Set(prev);
+                next.delete(filename);
+                return next;
+            });
+        }
     };
 
     const handleExplain = async () => {
@@ -204,7 +234,7 @@ export default function DrawerContent({
                             </button>
                             <button 
                                 className="download-code-btn" 
-                                onClick={() => downloadZip(data.html, downloadFormat)}
+                                onClick={() => downloadZip(data.html, downloadFormat, data.additionalFiles)}
                                 title="Download Project Zip"
                             >
                                 <DownloadIcon /> Zip
@@ -323,9 +353,27 @@ export default function DrawerContent({
                                     <div className="file-structure">
                                         <div className="structure-label">Suggested Structure:</div>
                                         <ul className="structure-list">
-                                            {page.fileStructure.map((file, j) => (
-                                                <li key={j}>{file}</li>
-                                            ))}
+                                            {page.fileStructure.map((file, j) => {
+                                                const isGenerated = data?.additionalFiles?.[file];
+                                                const isGenerating = generatingFiles.has(file);
+                                                
+                                                return (
+                                                    <li key={j} className="structure-item">
+                                                        <span className="file-name">{file}</span>
+                                                        {isGenerated ? (
+                                                            <span className="generated-tag">Added</span>
+                                                        ) : (
+                                                            <button 
+                                                                className="generate-file-btn"
+                                                                onClick={() => handleGeneratePageFile(file, `Part of ${page.title}: ${page.description}`)}
+                                                                disabled={isGenerating}
+                                                            >
+                                                                {isGenerating ? 'Generating...' : 'Generate'}
+                                                            </button>
+                                                        )}
+                                                    </li>
+                                                );
+                                            })}
                                         </ul>
                                     </div>
                                 </div>

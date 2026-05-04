@@ -15,203 +15,43 @@ async function startServer() {
   app.use(cookieParser());
   app.use(express.json());
 
-  // === GitHub OAuth Routes ===
+  // === Custom APIs ===
 
-  // 1. Get Auth URL
-  app.get('/api/auth/github/url', (req, res) => {
-    const clientId = process.env.GITHUB_CLIENT_ID;
-    if (!clientId) {
-      return res.status(500).json({ error: 'GITHUB_CLIENT_ID not configured' });
-    }
+  // Example API: Health Check
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
 
-    // Determine redirect URI based on request origin or environment
-    // In dev/preview, we use the request headers or a fixed path
-    // The client should call this endpoint
-    const redirectUri = `${req.protocol}://${req.get('host')}/auth/callback`;
+  // Example API: User Settings (JSON storage simulation)
+  let mockDatabase = { settings: { theme: 'dark', notifications: true } };
+  app.get("/api/settings", (req, res) => {
+    res.json(mockDatabase.settings);
+  });
+
+  app.post("/api/settings", (req, res) => {
+    mockDatabase.settings = { ...mockDatabase.settings, ...req.body };
+    res.json({ success: true, settings: mockDatabase.settings });
+  });
+
+  // === Webhook Receiver ===
+
+  /**
+   * Webhook handler for external services (e.g., Stripe, Shopify, GitHub)
+   * In a real app, you would verify the signature here.
+   */
+  app.post("/api/webhooks/incoming", (req, res) => {
+    const payload = req.body;
+    const signature = req.headers['x-webhook-signature']; // Example header
+
+    console.log("Received Webhook Payload:", payload);
     
-    const params = new URLSearchParams({
-      client_id: clientId,
-      redirect_uri: redirectUri,
-      scope: 'repo gist', // Request access to repos and gists
-      state: Math.random().toString(36).substring(7)
-    });
-
-    res.json({ url: `https://github.com/login/oauth/authorize?${params}` });
-  });
-
-  // 2. Callback Handler
-  app.get('/auth/callback', async (req, res) => {
-    const { code } = req.query;
-    const clientId = process.env.GITHUB_CLIENT_ID;
-    const clientSecret = process.env.GITHUB_CLIENT_SECRET;
-
-    if (!code || !clientId || !clientSecret) {
-      return res.status(400).send('Missing code or configuration');
+    // Process the webhook asynchronously
+    if (payload.event === 'order.created') {
+      console.log(`Processing new order: ${payload.orderId}`);
     }
 
-    try {
-      const tokenResponse = await axios.post('https://github.com/login/oauth/access_token', {
-        client_id: clientId,
-        client_secret: clientSecret,
-        code,
-      }, {
-        headers: { Accept: 'application/json' }
-      });
-
-      const { access_token } = tokenResponse.data;
-
-      if (access_token) {
-        // Set HTTP-only cookie
-        res.cookie('github_token', access_token, {
-          httpOnly: true,
-          secure: true,
-          sameSite: 'none',
-          maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
-        });
-
-        // Send success message to window.opener
-        res.send(`
-          <html>
-            <body>
-              <script>
-                if (window.opener) {
-                  window.opener.postMessage({ type: 'GITHUB_AUTH_SUCCESS' }, '*');
-                  window.close();
-                } else {
-                  window.location.href = '/';
-                }
-              </script>
-              <p>Authentication successful! You can close this window.</p>
-            </body>
-          </html>
-        `);
-      } else {
-        res.status(400).send('Failed to obtain access token');
-      }
-    } catch (error) {
-      console.error('GitHub Auth Error:', error);
-      res.status(500).send('Authentication failed');
-    }
-  });
-
-  // 3. Check Status
-  app.get('/api/github/status', (req, res) => {
-    const token = req.cookies.github_token;
-    res.json({ connected: !!token });
-  });
-
-  // 4. Save to GitHub (Gist or Repo)
-  app.post('/api/github/save', async (req, res) => {
-    const token = req.cookies.github_token;
-    if (!token) {
-      return res.status(401).json({ error: 'Not authenticated' });
-    }
-
-    const { content, filename, description, isPublic, type, repoName, files, branch = 'main' } = req.body;
-
-    try {
-      if (type === 'repo') {
-        // 1. Get User Info to know the owner
-        const userRes = await axios.get('https://api.github.com/user', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        const username = userRes.data.login;
-        const fullRepoName = repoName.includes('/') ? repoName : `${username}/${repoName}`;
-        const [owner, name] = fullRepoName.split('/');
-
-        let repo;
-        // 2. Check if repo exists
-        try {
-          const checkRepoRes = await axios.get(`https://api.github.com/repos/${fullRepoName}`, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          repo = checkRepoRes.data;
-        } catch (e: any) {
-          if (e.response?.status === 404) {
-            // Create if not exists
-            try {
-              const createRepoRes = await axios.post('https://api.github.com/user/repos', {
-                name: name,
-                description: description || 'Generated by Flash UI',
-                private: !isPublic,
-                auto_init: true // Initialize with README so we can push to main
-              }, {
-                headers: { Authorization: `Bearer ${token}` }
-              });
-              repo = createRepoRes.data;
-              // Wait a bit for init
-              await new Promise(resolve => setTimeout(resolve, 2000));
-            } catch (createErr: any) {
-               console.error('Repo creation failed', createErr.response?.data);
-               return res.status(400).json({ error: createErr.response?.data?.message || 'Failed to create repository' });
-            }
-          } else {
-            throw e;
-          }
-        }
-
-        // 3. Push files
-        // We need to handle branch creation if it doesn't exist? 
-        // For simplicity, we'll assume 'main' or the default branch exists or we are pushing to it.
-        // If the user specifies a new branch, we'd need to create a ref. 
-        // Let's stick to updating files individually for now as it's the most robust "simple" way without git data API complexity.
-        
-        const fileEntries = files ? Object.entries(files) : [[filename || 'index.html', content]];
-        
-        for (const [path, fileContent] of fileEntries) {
-          // Check if file exists to get SHA (for update)
-          let sha;
-          try {
-            const fileRes = await axios.get(`https://api.github.com/repos/${fullRepoName}/contents/${path}?ref=${branch}`, {
-               headers: { Authorization: `Bearer ${token}` }
-            });
-            sha = fileRes.data.sha;
-          } catch (e) {}
-
-          await axios.put(`https://api.github.com/repos/${fullRepoName}/contents/${path}`, {
-            message: `Update ${path} from Flash UI`,
-            content: Buffer.from(fileContent as string).toString('base64'),
-            branch: branch,
-            sha: sha
-          }, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-        }
-
-        return res.json({ url: repo.html_url, id: repo.id });
-      } else {
-        // Create a Gist (existing logic)
-        const gistFiles = files ? Object.fromEntries(
-          Object.entries(files).map(([path, content]) => [path, { content }])
-        ) : { [filename || 'index.html']: { content } };
-
-        const response = await axios.post('https://api.github.com/gists', {
-          description: description || 'Generated by Flash UI',
-          public: isPublic !== false,
-          files: gistFiles
-        }, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: 'application/vnd.github.v3+json'
-          }
-        });
-
-        res.json({ url: response.data.html_url, id: response.data.id });
-      }
-    } catch (error: any) {
-      console.error('GitHub Save Error:', error.response?.data || error.message);
-      res.status(500).json({ error: 'Failed to save to GitHub' });
-    }
-  });
-
-  // 5. Logout
-  app.post('/api/github/logout', (req, res) => {
-    res.clearCookie('github_token', {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'none'
-    });
-    res.json({ success: true });
+    // Always respond quickly with 200 or 202 to the sender
+    res.status(202).json({ received: true });
   });
 
   // === Vite Middleware ===

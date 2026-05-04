@@ -31,12 +31,13 @@ export interface ExportedFiles {
     [filename: string]: string;
 }
 
-export const getExportedFiles = (html: string, format: string): ExportedFiles => {
+export const getExportedFiles = (html: string, format: string, additionalFiles?: Record<string, string>): ExportedFiles => {
     const { css, js, body } = extractParts(html);
+    let files: ExportedFiles = {};
 
     switch (format) {
         case 'static':
-            return {
+            files = {
                 'index.html': `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -53,9 +54,10 @@ ${body}
                 'style.css': css,
                 'script.js': js
             };
+            break;
 
         case 'nextjs':
-            return {
+            files = {
                 'page.tsx': `import React from 'react';
 import './styles.css';
 
@@ -81,9 +83,10 @@ ${body.replace(/`/g, '\\`').replace(/\$/g, '\\$')}
   )
 }`
             };
+            break;
 
         case 'wix':
-            return {
+            files = {
                 'velo-code.js': `// Wix Velo Code
 $w.onReady(function () {
     // Add your JS here
@@ -92,9 +95,10 @@ $w.onReady(function () {
                 'structure.html': body,
                 'styles.css': css
             };
+            break;
 
         case 'notion':
-            return {
+            files = {
                 'notion-embed.md': `### Generated UI Component
 
 To use this in Notion:
@@ -107,9 +111,10 @@ ${html}
 \`\`\``,
                 'readme.txt': 'Notion does not support direct multi-file imports. Use the HTML code block as described in notion-embed.md'
             };
+            break;
 
         case 'react':
-            return {
+            files = {
                 'FlashComponent.tsx': `import React from 'react';
 import './styles.css';
 
@@ -122,9 +127,10 @@ ${body.replace(/`/g, '\\`').replace(/\$/g, '\\$')}
 }`,
                 'styles.css': css
             };
+            break;
 
         case 'vue':
-            return {
+            files = {
                 'FlashComponent.vue': `<template>
   <div v-html="htmlContent"></div>
 </template>
@@ -139,9 +145,10 @@ ${body.replace(/`/g, '\\`').replace(/\$/g, '\\$')}
 ${css}
 </style>`
             };
+            break;
 
         case 'svelte':
-            return {
+            files = {
                 'FlashComponent.svelte': `<script>
   const html = \`
 ${body.replace(/`/g, '\\`').replace(/\$/g, '\\$')}
@@ -154,16 +161,20 @@ ${body.replace(/`/g, '\\`').replace(/\$/g, '\\$')}
 ${css}
 </style>`
             };
+            break;
 
         default:
-            return { 'index.html': html };
+            files = { 'index.html': html };
+            break;
     }
+
+    return { ...files, ...(additionalFiles || {}) };
 };
 
-export const downloadCode = (code: string, format: string) => {
+export const downloadCode = (code: string, format: string, additionalFiles?: Record<string, string>) => {
     if (!code) return;
     
-    const files = getExportedFiles(code, format);
+    const files = getExportedFiles(code, format, additionalFiles);
     const filenames = Object.keys(files);
 
     if (filenames.length === 1) {
@@ -178,15 +189,15 @@ export const downloadCode = (code: string, format: string) => {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
     } else {
-        downloadZip(code, format);
+        downloadZip(code, format, additionalFiles);
     }
 };
 
-export const downloadZip = async (code: string, format: string) => {
+export const downloadZip = async (code: string, format: string, additionalFiles?: Record<string, string>) => {
     if (!code) return;
     
     const zip = new JSZip();
-    const files = getExportedFiles(code, format);
+    const files = getExportedFiles(code, format, additionalFiles);
     const timestamp = Date.now();
 
     Object.entries(files).forEach(([filename, content]) => {

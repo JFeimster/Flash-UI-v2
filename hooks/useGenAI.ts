@@ -227,6 +227,57 @@ Required JSON Output Format (stream ONE object per line):
         ));
     };
 
+    const updateSessionArtifactFiles = (sessionId: string, artifactId: string, files: Record<string, string>) => {
+        setSessions(prev => prev.map(sess => 
+            sess.id === sessionId ? {
+                ...sess,
+                artifacts: sess.artifacts.map(art => 
+                    art.id === artifactId ? { 
+                        ...art, 
+                        additionalFiles: { ...(art.additionalFiles || {}), ...files } 
+                    } : art
+                )
+            } : sess
+        ));
+    };
+
+    const generateAdditionalFile = useCallback(async (baseHtml: string, filename: string, description: string) => {
+        try {
+            const apiKey = process.env.API_KEY;
+            if (!apiKey) throw new Error("API_KEY is not configured.");
+            const ai = new GoogleGenAI({ apiKey });
+
+            const prompt = `
+You are building an addition to an existing UI component.
+BASE COMPONENT CODE:
+\`\`\`html
+${baseHtml}
+\`\`\`
+
+YOUR TASK:
+Generate the code for a new file named "${filename}".
+PURPOSE: ${description}
+
+STRICT REQUIREMENTS:
+- Return ONLY the raw code for this file.
+- If it's an HTML file, provide a full valid HTML document.
+- If it's a CSS or JS file, provide only that content.
+- Ensure it visually matches the BASE COMPONENT.
+- No Markdown, no explanations.
+            `.trim();
+
+            const result = await withRetry(() => ai.models.generateContent({
+                model: 'gemini-3-flash-preview',
+                contents: [{ parts: [{ text: prompt }], role: 'user' }],
+            })) as GenerateContentResponse;
+
+            return result.text;
+        } catch (e) {
+            console.error("Error generating additional file:", e);
+            return "";
+        }
+    }, []);
+
     const toggleFavorite = useCallback((sessionId: string, artifactId: string) => {
         setSessions(prev => prev.map(s => 
             s.id === sessionId ? {
@@ -401,6 +452,7 @@ Return ONLY a JSON array of objects with the following structure:
         sendMessage,
         generateVariations,
         updateSessionArtifact,
+        updateSessionArtifactFiles,
         setComponentVariations,
         resetSessions,
         toggleFavorite,
@@ -408,6 +460,7 @@ Return ONLY a JSON array of objects with the following structure:
         refactorCode,
         generateRecommendedPages,
         applyAnimation,
-        suggestComponents
+        suggestComponents,
+        generateAdditionalFile
     };
 }
