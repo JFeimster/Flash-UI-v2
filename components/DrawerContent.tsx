@@ -5,11 +5,12 @@
 */
 
 import React, { useState, useEffect } from 'react';
-import { ThinkingIcon, DownloadIcon, BotIcon, SparklesIcon, LayoutIcon, CodeIcon, CopyIcon } from './Icons';
+import { ThinkingIcon, DownloadIcon, BotIcon, SparklesIcon, LayoutIcon, CodeIcon, CopyIcon, ChevronDownIcon } from './Icons';
 import { ComponentVariation, RecommendedPage, AnimationStyle } from '../types';
 import { TEMPLATES } from '../templates';
 import { ANIMATION_STYLES } from '../animations';
 import { downloadCode, downloadZip, getExportedFiles, ExportedFiles } from '../utils/export';
+import { formatAsMarkdown, downloadAsMarkdown, downloadAsPlainText, downloadAsPDF, downloadAsDoc } from '../utils/exportRecommendations';
 
 interface DrawerContentProps {
     mode: 'code' | 'variations' | 'templates' | 'recommended' | 'animations' | null;
@@ -131,6 +132,8 @@ export default function DrawerContent({
     // Recommended Pages state
     const [recommendedPages, setRecommendedPages] = useState<RecommendedPage[]>([]);
     const [isRecommendedLoading, setIsRecommendedLoading] = useState(false);
+    const [showExportMenu, setShowExportMenu] = useState(false);
+    const [exportFeedback, setExportFeedback] = useState<string | null>(null);
 
     // Animations state
     const [isAnimating, setIsAnimating] = useState(false);
@@ -139,6 +142,31 @@ export default function DrawerContent({
     const [activeFile, setActiveFile] = useState<string>('');
     const [generatingFiles, setGeneratingFiles] = useState<Set<string>>(new Set());
     const [exportedFiles, setExportedFiles] = useState<ExportedFiles>({});
+
+    const handleCopyRecommended = () => {
+        const md = formatAsMarkdown(recommendedPages);
+        navigator.clipboard.writeText(md);
+        setExportFeedback('Copied Markdown!');
+        setTimeout(() => setExportFeedback(null), 2000);
+    };
+
+    const handleDownloadFormat = async (format: 'md' | 'txt' | 'pdf' | 'doc') => {
+        switch (format) {
+            case 'md':
+                downloadAsMarkdown(recommendedPages);
+                break;
+            case 'txt':
+                downloadAsPlainText(recommendedPages);
+                break;
+            case 'pdf':
+                downloadAsPDF(recommendedPages);
+                break;
+            case 'doc':
+                await downloadAsDoc(recommendedPages);
+                break;
+        }
+        setShowExportMenu(false);
+    };
 
     const isLoadingVariations = isLoading && mode === 'variations' && componentVariations.length === 0;
 
@@ -558,6 +586,35 @@ export default function DrawerContent({
 
             {mode === 'recommended' && (
                 <div className="recommended-pages-wrapper">
+                    <div className="recommended-actions-bar">
+                        <div className="section-title">Project Blueprint</div>
+                        <div className="blueprint-actions">
+                            <button 
+                                className="blueprint-btn copy-btn"
+                                onClick={handleCopyRecommended}
+                                title="Copy as Markdown"
+                            >
+                                <CopyIcon /> {exportFeedback || 'Copy Markdown'}
+                            </button>
+                            <div className="export-menu-container">
+                                <button 
+                                    className="blueprint-btn export-btn"
+                                    onClick={() => setShowExportMenu(!showExportMenu)}
+                                >
+                                    <DownloadIcon /> Export <ChevronDownIcon />
+                                </button>
+                                {showExportMenu && (
+                                    <div className="export-dropdown">
+                                        <button onClick={() => handleDownloadFormat('md')}>Markdown (.md)</button>
+                                        <button onClick={() => handleDownloadFormat('txt')}>Text (.txt)</button>
+                                        <button onClick={() => handleDownloadFormat('pdf')}>PDF Document</button>
+                                        <button onClick={() => handleDownloadFormat('doc')}>Word Doc (.docx)</button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
                     {isRecommendedLoading ? (
                         <div className="loading-state">
                             <ThinkingIcon /> 

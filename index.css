@@ -400,17 +400,17 @@ html, body {
 /* Attachment Styles */
 .attachment-preview-list {
     display: flex;
-    gap: 8px;
-    padding: 8px 12px 0;
+    gap: 12px;
+    padding: 0 0 16px 0;
     overflow-x: auto;
 }
 
 .attachment-preview {
-    position: relative;
-    width: 48px;
-    height: 48px;
+    width: 60px;
+    height: 60px;
     border-radius: 8px;
     overflow: hidden;
+    position: relative;
     border: 1px solid var(--border-color);
     background: #000;
     flex-shrink: 0;
@@ -974,18 +974,12 @@ html, body {
 
 /* Suggestions Row */
 .suggestions-row {
-    position: absolute;
-    bottom: calc(100% + 12px);
-    left: 50%;
-    transform: translateX(-50%);
     display: flex;
     align-items: center;
-    gap: 8px;
-    width: 100%;
-    max-width: 600px;
+    gap: 12px;
+    margin-bottom: 8px;
     overflow-x: auto;
-    padding: 4px 0;
-    scrollbar-width: none;
+    padding-bottom: 4px;
 }
 
 .suggestions-row::-webkit-scrollbar {
@@ -993,36 +987,42 @@ html, body {
 }
 
 .suggestions-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-secondary);
+    white-space: nowrap;
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--text-secondary);
-    white-space: nowrap;
-    margin-right: 4px;
+    flex-shrink: 0;
+}
+
+.suggestions-list {
+    display: flex;
+    gap: 8px;
 }
 
 .suggestion-chip {
-    background: var(--input-bg);
-    backdrop-filter: blur(8px);
+    background: rgba(255, 255, 255, 0.05);
     border: 1px solid var(--border-color);
-    padding: 6px 12px;
-    border-radius: 99px;
+    padding: 2px 10px;
+    border-radius: 4px;
+    font-size: 10px;
+    text-transform: uppercase;
+    font-family: var(--font-mono);
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.2s;
     display: flex;
     align-items: center;
-    gap: 6px;
-    cursor: pointer;
-    transition: all 0.2s ease;
+    gap: 4px;
     white-space: nowrap;
-    color: var(--text-primary);
-    font-size: 0.85rem;
 }
 
 .suggestion-chip:hover {
-    background: var(--accent-bg);
-    border-color: var(--text-secondary);
-    transform: translateY(-2px);
+    background: var(--neon-accent);
+    border-color: var(--neon-accent);
+    transform: translateY(-1px);
 }
 
 .suggestion-icon {
@@ -1115,11 +1115,19 @@ html, body {
     cursor: not-allowed;
 }
 
+.input-field-container {
+    position: relative;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+
 .animated-placeholder {
     position: absolute;
-    left: 108px;
+    left: 0;
     color: var(--text-secondary);
-    opacity: 0.7;
+    opacity: 0.3;
     pointer-events: none;
     animation: placeholderSlideUp 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
     white-space: nowrap;
@@ -1127,7 +1135,7 @@ html, body {
     display: flex;
     align-items: center;
     gap: 12px;
-    right: 60px; 
+    right: 0; 
 }
 
 .placeholder-text { text-overflow: ellipsis; overflow: hidden; }
@@ -1167,13 +1175,16 @@ html, body {
 .input-generating-label {
     flex: 1; display: flex; align-items: center; justify-content: space-between;
     gap: 12px; color: var(--text-secondary); overflow: hidden;
-    padding-right: 8px; padding-left: 4px;
+    padding-right: 8px;
 }
 
 .generating-prompt-text {
-    font-size: 0.95rem; white-space: nowrap; overflow: hidden;
-    text-overflow: ellipsis; opacity: 0.8;
-    animation: pulseText 1.5s infinite alternate ease-in-out;
+    flex: 1;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    opacity: 0.8;
 }
 
 .input-generating-label .spin-icon { 
@@ -2078,18 +2089,37 @@ html, body {
     display: grid;
     grid-template-columns: 1fr auto;
     gap: 16px;
-    align-items: flex-end;
+    align-items: center; /* Better alignment for all elements */
+}
+
+@media (max-width: 800px) {
+    .input-dashboard-main {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    
+    .input-actions {
+        width: 100%;
+        display: flex;
+    }
+    
+    .technical-btn {
+        flex: 1;
+        justify-content: center;
+        padding: 12px;
+    }
 }
 
 .styled-input-wrapper {
     background: var(--accent-bg);
     border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 12px 16px;
+    border-radius: 12px; /* Smoother corners */
+    padding: 8px 16px;
     display: flex;
-    gap: 12px;
+    gap: 8px;
     align-items: center;
-    transition: all 0.2s;
+    transition: all 0.3s cubic-bezier(0.19, 1, 0.22, 1);
+    min-width: 0; /* Important for flex child to shrink properly */
 }
 
 .styled-input-wrapper:focus-within {
@@ -2116,14 +2146,19 @@ html, body {
     background: #fff;
     color: #000;
     border: none;
-    border-radius: 4px;
-    padding: 10px 20px;
-    font-weight: 600;
-    font-size: 0.9rem;
+    border-radius: 8px; /* Matching the input wrapper */
+    padding: 12px 24px;
+    font-weight: 700;
+    font-size: 0.85rem;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.2s cubic-bezier(0.19, 1, 0.22, 1);
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 1.5px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .technical-btn:hover:not(:disabled) {
@@ -2144,5 +2179,119 @@ html, body {
 
 .technical-btn.secondary:hover {
     background: var(--border-color);
+}
+
+/* === Recommended Pages Styles === */
+.recommended-pages-wrapper {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    height: 100%;
+    overflow-y: auto;
+}
+
+.recommended-actions-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border-color);
+    position: sticky;
+    top: 0;
+    background: var(--stage-bg);
+    z-index: 10;
+    margin: -24px -24px 0 -24px;
+    padding: 24px;
+}
+
+.section-title {
+    font-family: var(--font-sans);
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+.blueprint-actions {
+    display: flex;
+    gap: 12px;
+}
+
+.blueprint-btn {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+    color: #fff;
+    border-radius: 6px;
+    padding: 10px 16px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.19, 1, 0.22, 1);
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+}
+
+.blueprint-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255,255,255,0.2);
+    transform: translateY(-1px);
+}
+
+.blueprint-btn svg {
+    width: 14px;
+    height: 14px;
+    opacity: 0.8;
+}
+
+.export-menu-container {
+    position: relative;
+}
+
+.export-dropdown {
+    position: absolute;
+    top: calc(100% + 12px);
+    right: 0;
+    background: #09090b;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 8px;
+    min-width: 200px;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+    backdrop-filter: blur(10px);
+    animation: slideInDown 0.3s cubic-bezier(0.19, 1, 0.22, 1);
+}
+
+.export-dropdown button {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.6);
+    padding: 12px 14px;
+    text-align: left;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: var(--font-sans);
+}
+
+.export-dropdown button:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: #fff;
+    padding-left: 18px;
+}
+
+.recommended-list {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
 }
 
