@@ -10,9 +10,19 @@ import { generateId, withRetry } from '../utils';
 import { Session, Artifact, ComponentVariation, SuggestedComponent } from '../types';
 
 const STORAGE_KEY = 'flash_ui_sessions_v1';
+const SAVED_KEY = 'flash_ui_saved_v1';
+const API_KEY_STORAGE_KEY = 'flash_ui_user_api_key';
 
 export const useGenAI = () => {
     // Initialize state from localStorage
+    const [userApiKey, setUserApiKey] = useState<string>(() => {
+        try {
+            return localStorage.getItem(API_KEY_STORAGE_KEY) || '';
+        } catch {
+            return '';
+        }
+    });
+
     const [sessions, setSessions] = useState<Session[]>(() => {
         try {
             const saved = localStorage.getItem(STORAGE_KEY);
@@ -23,21 +33,79 @@ export const useGenAI = () => {
         }
     });
 
+    const [savedArtifacts, setSavedArtifacts] = useState<Artifact[]>(() => {
+        try {
+            const saved = localStorage.getItem(SAVED_KEY);
+            return saved ? JSON.parse(saved) : [];
+        } catch (e) {
+            console.warn('Failed to load saved artifacts from local storage', e);
+            return [];
+        }
+    });
+
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [componentVariations, setComponentVariations] = useState<ComponentVariation[]>([]);
 
-    // Persist sessions to localStorage with debounce
+    const [apiKeyStatus, setApiKeyStatus] = useState<{
+        isValid: boolean | null;
+        error: string | null;
+        quotaInfo?: string;
+    }>({ isValid: null, error: null });
+
+    // Persist to localStorage with debounce
     useEffect(() => {
         const handler = setTimeout(() => {
             try {
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+                localStorage.setItem(SAVED_KEY, JSON.stringify(savedArtifacts));
+                if (userApiKey) {
+                    localStorage.setItem(API_KEY_STORAGE_KEY, userApiKey);
+                } else {
+                    localStorage.removeItem(API_KEY_STORAGE_KEY);
+                }
             } catch (e) {
-                console.warn('Failed to save sessions to local storage', e);
+                console.warn('Failed to save state to local storage', e);
             }
-        }, 1000); // Debounce save by 1s
+        }, 1000);
 
         return () => clearTimeout(handler);
-    }, [sessions]);
+    }, [sessions, savedArtifacts, userApiKey]);
+
+    const validateApiKey = useCallback(async (key: string) => {
+        if (!key) {
+            setApiKeyStatus({ isValid: false, error: 'API Key is required.' });
+            return false;
+        }
+
+        try {
+            const ai = new GoogleGenAI({ apiKey: key });
+            
+            // Simple validation call using the SDK's existing pattern
+            const result = await ai.models.generateContent({
+                model: 'gemini-1.5-flash',
+                contents: [{ parts: [{ text: 'ping' }], role: 'user' }]
+            }) as GenerateContentResponse;
+
+            if (result) {
+                setApiKeyStatus({ 
+                    isValid: true, 
+                    error: null,
+                    quotaInfo: 'Key is functional. Status: Active'
+                });
+                return true;
+            }
+            return false;
+        } catch (e: any) {
+            setApiKeyStatus({ isValid: false, error: e.message || 'Invalid API Key or network error.' });
+            return false;
+        }
+    }, []);
+
+    const getAiClient = useCallback(() => {
+        const key = userApiKey || process.env.API_KEY || (process.env as any).GEMINI_API_KEY;
+        if (!key) throw new Error("No Gemini API key found. Please configure one in AI Tools.");
+        return new GoogleGenAI({ apiKey: key });
+    }, [userApiKey]);
 
     const parseJsonStream = async function* (responseStream: any) {
         let buffer = '';
@@ -81,9 +149,7 @@ export const useGenAI = () => {
         setComponentVariations([]);
 
         try {
-            const apiKey = process.env.API_KEY;
-            if (!apiKey) throw new Error("API_KEY is not configured.");
-            const ai = new GoogleGenAI({ apiKey });
+            const ai = getAiClient();
 
             const prompt = `
 You are a master UI/UX designer. Generate 3 RADICAL CONCEPTUAL VARIATIONS of: "${currentSession.prompt}".
@@ -126,9 +192,9 @@ Required JSON Output Format (stream ONE object per line):
         }
     }, []);
 
-    const sendMessage = useCallback(async (promptText: string) => {
+    const sendMessage = useCallback(async (promptText: string, attachments: { mimeType: string, data: string }[] = []) => {
         const trimmedInput = promptText.trim();
-        if (!trimmedInput) return;
+        if (!trimmedInput && attachments.length === 0) return;
 
         setIsLoading(true);
         
@@ -144,7 +210,7 @@ Required JSON Output Format (stream ONE object per line):
 
         const newSession: Session = {
             id: sessionId,
-            prompt: trimmedInput,
+            prompt: trimmedInput || (attachments.length > 0 ? "Generate UI from image" : ""),
             timestamp: baseTime,
             artifacts: placeholderArtifacts
         };
@@ -152,11 +218,9 @@ Required JSON Output Format (stream ONE object per line):
         setSessions(prev => [...prev, newSession]);
 
         try {
-            const apiKey = process.env.API_KEY;
-            if (!apiKey) throw new Error("API_KEY is not configured.");
-            const ai = new GoogleGenAI({ apiKey });
+            const ai = getAiClient();
 
-            const stylePrompt = `Generate 3 distinct visual names for: "${trimmedInput}". Return ONLY a JSON array of strings. e.g. ["Cyber Grid", "Glass Echo", "Paper Grain"]. No trademarks.`;
+            const stylePrompt = `Based on this request: "${trimmedInput || 'UI from image'}", suggest 3 distinct visual names/styles. Return ONLY a JSON array of strings. e.g. ["Cyber Grid", "Glass Echo", "Paper Grain"]. No trademarks.`;
 
             // Wrap style generation with retry logic
             const styleResponse = await withRetry(() => ai.models.generateContent({
@@ -177,12 +241,28 @@ Required JSON Output Format (stream ONE object per line):
 
             const generateArtifact = async (artifact: Artifact, styleInstruction: string) => {
                 try {
-                    const prompt = `Create a high-fidelity UI component for: "${trimmedInput}". Style: ${styleInstruction}. Return ONLY raw HTML/CSS. No Markdown.`;
+                    const prompt = `Create a high-fidelity UI component. 
+User Request: "${trimmedInput || 'Generate a UI based on the provided images'}". 
+Style Inspiration: ${styleInstruction}. 
+If images are provided, analyze their layout, colors, and components to recreate a functional and beautiful web version.
+Return ONLY raw HTML/CSS. No Markdown, no explanations.`;
                     
+                    const parts: any[] = [{ text: prompt }];
+                    
+                    // Add images if present
+                    attachments.forEach(att => {
+                        parts.push({
+                            inlineData: {
+                                mimeType: att.mimeType,
+                                data: att.data
+                            }
+                        });
+                    });
+
                     // Wrap stream connection with retry logic
                     const responseStream = await withRetry(() => ai.models.generateContentStream({
                         model: 'gemini-3-flash-preview',
-                        contents: [{ parts: [{ text: prompt }], role: "user" }],
+                        contents: [{ parts, role: 'user' }],
                     })) as any;
 
                     let accumulatedHtml = '';
@@ -243,9 +323,7 @@ Required JSON Output Format (stream ONE object per line):
 
     const generateAdditionalFile = useCallback(async (baseHtml: string, filename: string, description: string) => {
         try {
-            const apiKey = process.env.API_KEY;
-            if (!apiKey) throw new Error("API_KEY is not configured.");
-            const ai = new GoogleGenAI({ apiKey });
+            const ai = getAiClient();
 
             const prompt = `
 You are building an addition to an existing UI component.
@@ -289,6 +367,41 @@ STRICT REQUIREMENTS:
         ));
     }, []);
 
+    const toggleSave = useCallback((sessionId: string, artifactId: string) => {
+        const session = sessions.find(s => s.id === sessionId);
+        const artifact = session?.artifacts.find(a => a.id === artifactId);
+        
+        if (!artifact) return;
+
+        setSessions(prev => prev.map(s => 
+            s.id === sessionId ? {
+                ...s,
+                artifacts: s.artifacts.map(a => 
+                    a.id === artifactId ? { ...a, isSaved: !a.isSaved } : a
+                )
+            } : s
+        ));
+
+        setSavedArtifacts(prev => {
+            const exists = prev.find(a => a.id === artifactId);
+            if (exists) {
+                return prev.filter(a => a.id !== artifactId);
+            } else {
+                return [...prev, { ...artifact, isSaved: true }];
+            }
+        });
+    }, [sessions]);
+
+    const removeSaved = useCallback((artifactId: string) => {
+        setSavedArtifacts(prev => prev.filter(a => a.id !== artifactId));
+        setSessions(prev => prev.map(s => ({
+            ...s,
+            artifacts: s.artifacts.map(a => 
+                a.id === artifactId ? { ...a, isSaved: false } : a
+            )
+        })));
+    }, []);
+
     const resetSessions = useCallback(() => {
         setSessions([]);
         try {
@@ -300,9 +413,7 @@ STRICT REQUIREMENTS:
 
     const explainCode = useCallback(async (code: string) => {
         try {
-            const apiKey = process.env.API_KEY;
-            if (!apiKey) throw new Error("API_KEY is not configured.");
-            const ai = new GoogleGenAI({ apiKey });
+            const ai = getAiClient();
 
             const prompt = `Explain the following code snippet in a concise and clear way. Focus on the main functionality and key design choices:\n\n\`\`\`html\n${code}\n\`\`\``;
             
@@ -320,9 +431,7 @@ STRICT REQUIREMENTS:
 
     const refactorCode = useCallback(async (code: string, instruction: string, onChunk?: (chunk: string) => void) => {
         try {
-            const apiKey = process.env.API_KEY;
-            if (!apiKey) throw new Error("API_KEY is not configured.");
-            const ai = new GoogleGenAI({ apiKey });
+            const ai = getAiClient();
 
             const prompt = `Refactor the following code snippet based on this instruction: "${instruction}". Return ONLY the refactored raw HTML/CSS. No Markdown.\n\n\`\`\`html\n${code}\n\`\`\``;
             
@@ -350,9 +459,7 @@ STRICT REQUIREMENTS:
         if (!session) return [];
         
         try {
-            const apiKey = process.env.API_KEY;
-            if (!apiKey) throw new Error("API_KEY is not configured.");
-            const ai = new GoogleGenAI({ apiKey });
+            const ai = getAiClient();
 
             const prompt = `
 Analyze this UI component prompt: "${session.prompt}".
@@ -388,9 +495,7 @@ Return ONLY a JSON array of objects with the following structure:
 
     const applyAnimation = useCallback(async (code: string, animationPrompt: string) => {
         try {
-            const apiKey = process.env.API_KEY;
-            if (!apiKey) throw new Error("API_KEY is not configured.");
-            const ai = new GoogleGenAI({ apiKey });
+            const ai = getAiClient();
 
             const prompt = `Enhance the following UI component with this animation style: "${animationPrompt}". 
 Ensure the animations are "sizzling", modern, and highly engaging. 
@@ -410,9 +515,7 @@ Return ONLY the complete updated raw HTML/CSS. No Markdown, no explanations.\n\n
 
     const suggestComponents = useCallback(async (currentPrompt: string) => {
         try {
-            const apiKey = process.env.API_KEY;
-            if (!apiKey) throw new Error("API_KEY is not configured.");
-            const ai = new GoogleGenAI({ apiKey });
+            const ai = getAiClient();
 
             const prompt = `
 Based on the user's current UI design request: "${currentPrompt}", suggest 4 relevant UI components that would complement this design.
@@ -447,6 +550,11 @@ Return ONLY a JSON array of objects with the following structure:
 
     return {
         sessions,
+        savedArtifacts,
+        userApiKey,
+        setUserApiKey,
+        validateApiKey,
+        apiKeyStatus,
         isLoading,
         componentVariations,
         sendMessage,
@@ -456,6 +564,8 @@ Return ONLY a JSON array of objects with the following structure:
         setComponentVariations,
         resetSessions,
         toggleFavorite,
+        toggleSave,
+        removeSaved,
         explainCode,
         refactorCode,
         generateRecommendedPages,

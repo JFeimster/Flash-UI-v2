@@ -26,7 +26,14 @@ import {
     ArrowRightIcon, 
     GridIcon,
     HomeIcon,
-    LayoutIcon
+    LayoutIcon,
+    MagicWandIcon,
+    StarIcon,
+    StarFilledIcon,
+    BookmarkIcon,
+    BookmarkFilledIcon,
+    HeartIcon,
+    HeartFilledIcon
 } from './components/Icons';
 
 import FeaturesList from './components/FeaturesList';
@@ -47,6 +54,11 @@ export const XIcon = () => (
 function App() {
   const { 
     sessions, 
+    savedArtifacts,
+    userApiKey,
+    setUserApiKey,
+    validateApiKey,
+    apiKeyStatus,
     isLoading, 
     componentVariations, 
     sendMessage, 
@@ -56,6 +68,8 @@ function App() {
     setComponentVariations,
     resetSessions,
     toggleFavorite,
+    toggleSave,
+    removeSaved,
     explainCode,
     refactorCode,
     generateRecommendedPages,
@@ -81,7 +95,7 @@ function App() {
   
   const [drawerState, setDrawerState] = useState<{
       isOpen: boolean;
-      mode: 'code' | 'variations' | 'templates' | 'recommended' | 'animations' | null;
+      mode: 'code' | 'variations' | 'templates' | 'recommended' | 'animations' | 'ai-tools' | 'library' | null;
       title: string;
       data: any; 
   }>({ isOpen: false, mode: null, title: '', data: null });
@@ -90,6 +104,15 @@ function App() {
 
   useEffect(() => {
       inputRef.current?.focus();
+  }, []);
+
+  const handleShowLibrary = useCallback(() => {
+    setDrawerState({
+        isOpen: true,
+        mode: 'library',
+        title: 'Your Library',
+        data: null
+    });
   }, []);
 
   const handleSendMessage = useCallback((attachments: { mimeType: string, data: string }[] = []) => {
@@ -101,12 +124,12 @@ function App() {
     }
   }, [inputValue, sendMessage, setFocusedArtifactIndex]);
 
-  const handleSuggestionClick = (suggestion: SuggestedComponent) => {
+  const handleSuggestionClick = useCallback((suggestion: SuggestedComponent) => {
       setInputValue(suggestion.prompt);
       sendMessage(suggestion.prompt);
       setSuggestions([]);
       setFocusedArtifactIndex(null);
-  };
+  }, [sendMessage, setFocusedArtifactIndex]);
 
   // Fetch suggestions when a session is active or focused
   useEffect(() => {
@@ -117,30 +140,30 @@ function App() {
           };
           fetchSuggestions();
       }
-  }, [currentSession, isLoading, suggestComponents]);
+  }, [currentSession, isLoading, suggestComponents, suggestions.length]);
 
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
       resetSessions();
       setFocusedArtifactIndex(null);
       setInputValue('');
       setSuggestions([]);
-  };
+  }, [resetSessions, setFocusedArtifactIndex]);
 
-  const handleGenerateVariationsClick = () => {
+  const handleGenerateVariationsClick = useCallback(() => {
     if (currentSession && focusedArtifactIndex !== null) {
         setComponentVariations([]); // Clear previous
         setDrawerState({ isOpen: true, mode: 'variations', title: 'Variations', data: currentSession.artifacts[focusedArtifactIndex].id });
         generateVariations(currentSession, focusedArtifactIndex);
     }
-  };
+  }, [currentSession, focusedArtifactIndex, generateVariations, setComponentVariations]);
 
-  const handleApplyVariation = (html: string) => {
+  const handleApplyVariation = useCallback((html: string) => {
       if (focusedArtifactIndex === null) return;
       updateSessionArtifact(currentSessionIndex, focusedArtifactIndex, html);
       setDrawerState(s => ({ ...s, isOpen: false }));
-  };
+  }, [currentSessionIndex, focusedArtifactIndex, updateSessionArtifact]);
 
-  const handleShowCode = () => {
+  const handleShowCode = useCallback(() => {
       if (currentSession && focusedArtifactIndex !== null) {
           const artifact = currentSession.artifacts[focusedArtifactIndex];
           setDrawerState({ 
@@ -156,9 +179,9 @@ function App() {
               } 
           });
       }
-  };
+  }, [currentSession, focusedArtifactIndex]);
 
-  const handleShowRecommended = () => {
+  const handleShowRecommended = useCallback(() => {
       if (currentSession && focusedArtifactIndex !== null) {
           const artifact = currentSession.artifacts[focusedArtifactIndex];
           setDrawerState({ 
@@ -174,9 +197,9 @@ function App() {
               } 
           });
       }
-  };
+  }, [currentSession, focusedArtifactIndex]);
 
-  const handleUpdateArtifactFiles = (sessionId: string, artifactId: string, files: Record<string, string>) => {
+  const handleUpdateArtifactFiles = useCallback((sessionId: string, artifactId: string, files: Record<string, string>) => {
       updateSessionArtifactFiles(sessionId, artifactId, files);
       setDrawerState(prev => {
           if (prev.data?.sessionId === sessionId && prev.data?.artifactId === artifactId) {
@@ -190,28 +213,45 @@ function App() {
           }
           return prev;
       });
-  };
+  }, [updateSessionArtifactFiles]);
 
-  const handleShowAnimations = () => {
+  const handleShowAnimations = useCallback(() => {
       if (currentSession && focusedArtifactIndex !== null) {
           const artifact = currentSession.artifacts[focusedArtifactIndex];
           setDrawerState({ isOpen: true, mode: 'animations', title: 'Sizzling Animations', data: artifact.html });
       }
-  };
+  }, [currentSession, focusedArtifactIndex]);
 
-  const handleTemplateClick = (prompt: string) => {
+  const handleShowAITools = useCallback(() => {
+      if (currentSession && focusedArtifactIndex !== null) {
+          const artifact = currentSession.artifacts[focusedArtifactIndex];
+          setDrawerState({ 
+              isOpen: true, 
+              mode: 'ai-tools', 
+              title: 'AI Magic Tools', 
+              data: { 
+                  html: artifact.html, 
+                  prompt: currentSession.prompt,
+                  sessionId: currentSession.id,
+                  artifactId: artifact.id
+              } 
+          });
+      }
+  }, [currentSession, focusedArtifactIndex]);
+
+  const handleTemplateClick = useCallback((prompt: string) => {
       setDrawerState(prev => ({...prev, isOpen: false}));
       setInputValue(prompt.split('\n')[0]);
       sendMessage(prompt);
       setFocusedArtifactIndex(null);
-  };
+  }, [sendMessage, setFocusedArtifactIndex]);
 
-  const handleSurpriseMe = () => {
+  const handleSurpriseMe = useCallback(() => {
       const randomPrompt = INITIAL_PLACEHOLDERS[Math.floor(Math.random() * INITIAL_PLACEHOLDERS.length)];
       setInputValue(randomPrompt);
       sendMessage(randomPrompt);
       setFocusedArtifactIndex(null);
-  };
+  }, [sendMessage, setFocusedArtifactIndex]);
 
   const hasStarted = sessions.length > 0 || isLoading;
 
@@ -237,6 +277,14 @@ function App() {
             Templates
         </button>
 
+        <button 
+            className="library-button"
+            onClick={handleShowLibrary}
+            title="Your Library"
+        >
+            <BookmarkFilledIcon /> Library
+        </button>
+
         {hasStarted && (
             <button 
                 className="reset-button" 
@@ -259,8 +307,16 @@ function App() {
                 data={drawerState.data}
                 isLoading={isLoading}
                 componentVariations={componentVariations}
+                savedArtifacts={savedArtifacts}
+                userApiKey={userApiKey}
+                setUserApiKey={setUserApiKey}
+                validateApiKey={validateApiKey}
+                apiKeyStatus={apiKeyStatus}
                 onApplyVariation={handleApplyVariation}
                 onTemplateClick={handleTemplateClick}
+                toggleFavorite={toggleFavorite}
+                toggleSave={toggleSave}
+                removeSaved={removeSaved}
                 explainCode={explainCode}
                 refactorCode={refactorCode}
                 generateRecommendedPages={generateRecommendedPages}
@@ -311,11 +367,38 @@ function App() {
 
             <div className={`action-bar ${focusedArtifactIndex !== null ? 'visible' : ''}`}>
                  <div className="action-buttons">
+                    <button onClick={prevItem} disabled={!canGoBack}>
+                        <ArrowLeftIcon /> Back
+                    </button>
                     <button onClick={() => setFocusedArtifactIndex(null)}>
                         <GridIcon /> Grid View
                     </button>
+
+                    {currentSession && focusedArtifactIndex !== null && (
+                        <>
+                            <button 
+                                onClick={() => toggleFavorite(currentSession.id, currentSession.artifacts[focusedArtifactIndex].id)}
+                                className={currentSession.artifacts[focusedArtifactIndex].isFavorite ? 'active' : ''}
+                            >
+                                {currentSession.artifacts[focusedArtifactIndex].isFavorite ? <StarFilledIcon /> : <StarIcon />}
+                                {currentSession.artifacts[focusedArtifactIndex].isFavorite ? 'Favorited' : 'Favorite'}
+                            </button>
+
+                            <button 
+                                onClick={() => toggleSave(currentSession.id, currentSession.artifacts[focusedArtifactIndex].id)}
+                                className={currentSession.artifacts[focusedArtifactIndex].isSaved ? 'active' : ''}
+                            >
+                                {currentSession.artifacts[focusedArtifactIndex].isSaved ? <BookmarkFilledIcon /> : <BookmarkIcon />}
+                                {currentSession.artifacts[focusedArtifactIndex].isSaved ? 'Saved' : 'Save'}
+                            </button>
+                        </>
+                    )}
+
                     <button onClick={handleGenerateVariationsClick} disabled={isLoading}>
                         <SparklesIcon /> Variations
+                    </button>
+                    <button onClick={handleShowAITools} disabled={isLoading}>
+                        <MagicWandIcon /> AI Tools
                     </button>
                     <button onClick={handleShowAnimations} disabled={isLoading}>
                         <SparklesIcon /> Animate
@@ -325,6 +408,9 @@ function App() {
                     </button>
                     <button onClick={handleShowCode}>
                         <CodeIcon /> Source
+                    </button>
+                    <button onClick={nextItem} disabled={!canGoForward}>
+                        Next <ArrowRightIcon />
                     </button>
                  </div>
             </div>

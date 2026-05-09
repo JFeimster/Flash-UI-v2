@@ -8,17 +8,20 @@ export const TEMPLATES = [
     {
         title: "'Payroll Panic' Survival Dashboard",
         description: "Emergency cash-flow visualizer for contractors (ROK).",
-        prompt: `Design a high-stakes "Payroll Panic" Survival Dashboard for construction contractors. VISUAL STYLE: Crisis Management, High Contrast, "Red Alert" aesthetics. Matte Black background, Warning Red, Safety Yellow, Solvency Green. Mono-spaced numbers. LAYOUT: Countdown timer ("Time Until Payroll"), Visual bar chart gap (Cash vs Burden), Invoice Selector, Solvency Simulator toggle, CTA "Bridge the Gap".`
+        prompt: `Design a high-stakes "Payroll Panic" Survival Dashboard for construction contractors. VISUAL STYLE: Crisis Management, High Contrast, "Red Alert" aesthetics. Matte Black background, Warning Red, Safety Yellow, Solvency Green. Mono-spaced numbers. LAYOUT: Countdown timer ("Time Until Payroll"), Visual bar chart gap (Cash vs Burden), Invoice Selector, Solvency Simulator toggle, CTA "Bridge the Gap".`,
+        tags: ["Fintech", "Dashboard", "Crisis"]
     },
     {
         title: "'Stockout Death Spiral' Estimator",
         description: "Loss calculator for Amazon sellers (8fig).",
-        prompt: `Design a "Stockout Death Spiral" Estimator for high-volume Amazon sellers. VISUAL STYLE: Data-Forensics, Analytical, Serious. Deep Navy, Loss Red, Ghost Grey. LAYOUT: Header "Inventory Health: CRITICAL", Simulation graph (Funded vs Stockout), Damage Report grid, Capital Injection slider, CTA "Secure Inventory".`
+        prompt: `Design a "Stockout Death Spiral" Estimator for high-volume Amazon sellers. VISUAL STYLE: Data-Forensics, Analytical, Serious. Deep Navy, Loss Red, Ghost Grey. LAYOUT: Header "Inventory Health: CRITICAL", Simulation graph (Funded vs Stockout), Damage Report grid, Capital Injection slider, CTA "Secure Inventory".`,
+        tags: ["E-commerce", "Estimator", "Analytics"]
     },
     {
         title: "Amazon 'Phantom Cash' Audit",
         description: "Visualizes trapped 'DD+7' funds (Payability).",
-        prompt: `Design an "Amazon Phantom Cash" Audit tool. VISUAL STYLE: FinTech, Revealing, "Hidden Truth". Amazon Dark Blue, "Locked" Grey, "Liquid" Gold. LAYOUT: Receipt-style Ledger, Deferred Transactions breakdown with padlock icon, Interest Lost ticker, Unlock Animation toggle, Result CTA "Withdraw to Bank".`
+        prompt: `Design an "Amazon Phantom Cash" Audit tool. VISUAL STYLE: FinTech, Revealing, "Hidden Truth". Amazon Dark Blue, "Locked" Grey, "Liquid" Gold. LAYOUT: Receipt-style Ledger, Deferred Transactions breakdown with padlock icon, Interest Lost ticker, Unlock Animation toggle, Result CTA "Withdraw to Bank".`,
+        tags: ["Amazon", "Fintech", "Audit"]
     },
     {
         title: "'Spot Market' Breakeven Cockpit",
@@ -128,7 +131,8 @@ export const TEMPLATES = [
     {
         title: "SaaS Dashboard Dark",
         description: "Modern analytics dashboard with glassmorphism.",
-        prompt: `Create a high-fidelity SaaS analytics dashboard in dark mode. Modular grid layout. Sidebar nav, MRR chart, Metric cards (Active Users, Churn, LTV), Activity feed table. Glassmorphism effects, neon accents.`
+        prompt: `Create a high-fidelity SaaS analytics dashboard in dark mode. Modular grid layout. Sidebar nav, MRR chart, Metric cards (Active Users, Churn, LTV), Activity feed table. Glassmorphism effects, neon accents.`,
+        tags: ["SaaS", "Dashboard", "Dark Mode"]
     },
     {
         title: "Bold Motion Studio",
@@ -178,7 +182,8 @@ export const TEMPLATES = [
     {
         title: "Modern SaaS Landing",
         description: "Clean, high-conversion landing page for software.",
-        prompt: `Create a high-fidelity "Modern SaaS Landing Page". VISUAL STYLE: Trustworthy, Scalable. Crisp white, slate, primary blue. SECTIONS: Hero with 3D mockup, Social Proof, Zig-zag Features, Bento Grid, Pricing cards, Footer.`
+        prompt: `Create a high-fidelity "Modern SaaS Landing Page". VISUAL STYLE: Trustworthy, Scalable. Crisp white, slate, primary blue. SECTIONS: Hero with 3D mockup, Social Proof, Zig-zag Features, Bento Grid, Pricing cards, Footer.`,
+        tags: ["SaaS", "Landing Page", "Lead Gen"]
     },
     {
         title: "AI Tool Directory",

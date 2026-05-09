@@ -9,6 +9,7 @@ export interface Artifact {
   html: string;
   status: 'streaming' | 'complete' | 'error';
   isFavorite?: boolean;
+  isSaved?: boolean;
   additionalFiles?: Record<string, string>;
 }
 
@@ -27,6 +28,13 @@ export interface RecommendedPage {
     title: string;
     description: string;
     fileStructure: string[];
+}
+
+export interface Template {
+    title: string;
+    description: string;
+    prompt: string;
+    tags?: string[];
 }
 
 export interface AnimationStyle {

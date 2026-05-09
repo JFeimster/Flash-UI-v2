@@ -213,17 +213,17 @@ export default function InputBar({
                                 </div>
                             )}
                         </div>
-                    </div>
 
-                    <div className="input-actions">
-                        <button 
-                            className="technical-btn glitch-hover" 
-                            onClick={handleSend} 
-                            disabled={isLoading || (!inputValue.trim() && attachments.length === 0)}
-                        >
-                            {isLoading ? <ThinkingIcon /> : <ArrowUpIcon />}
-                            <span>{isLoading ? 'BUSY' : 'EXECUTE'}</span>
-                        </button>
+                        <div className="input-actions-fixed">
+                            <button 
+                                className="technical-btn glitch-hover" 
+                                onClick={handleSend} 
+                                disabled={isLoading || (!inputValue.trim() && attachments.length === 0)}
+                            >
+                                {isLoading ? <ThinkingIcon /> : <ArrowUpIcon />}
+                                <span className="btn-text">{isLoading ? 'BUSY' : 'EXECUTE'}</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

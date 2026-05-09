@@ -4,21 +4,32 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 
-import React, { useState, useEffect } from 'react';
-import { ThinkingIcon, DownloadIcon, BotIcon, SparklesIcon, LayoutIcon, CodeIcon, CopyIcon, ChevronDownIcon } from './Icons';
-import { ComponentVariation, RecommendedPage, AnimationStyle } from '../types';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { ThinkingIcon, DownloadIcon, BotIcon, SparklesIcon, LayoutIcon, CodeIcon, CopyIcon, ChevronDownIcon, MagicWandIcon, SearchIcon, StarIcon, StarFilledIcon, BookmarkIcon, BookmarkFilledIcon, HeartIcon, HeartFilledIcon, XIcon, InfoIcon, CheckIcon, AlertCircleIcon } from './Icons';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { Artifact, ComponentVariation, RecommendedPage, AnimationStyle, Template } from '../types';
 import { TEMPLATES } from '../templates';
 import { ANIMATION_STYLES } from '../animations';
 import { downloadCode, downloadZip, getExportedFiles, ExportedFiles } from '../utils/export';
 import { formatAsMarkdown, downloadAsMarkdown, downloadAsPlainText, downloadAsPDF, downloadAsDoc } from '../utils/exportRecommendations';
+import { deployToVercel } from '../utils/vercel';
 
 interface DrawerContentProps {
-    mode: 'code' | 'variations' | 'templates' | 'recommended' | 'animations' | null;
+    mode: 'code' | 'variations' | 'templates' | 'recommended' | 'animations' | 'ai-tools' | 'library' | null;
     data: any;
     isLoading: boolean;
     componentVariations: ComponentVariation[];
+    savedArtifacts: Artifact[];
+    userApiKey?: string;
+    setUserApiKey?: (key: string) => void;
+    validateApiKey?: (key: string) => Promise<boolean>;
+    apiKeyStatus?: { isValid: boolean | null; error: string | null; quotaInfo?: string };
     onApplyVariation: (html: string) => void;
     onTemplateClick: (prompt: string) => void;
+    toggleFavorite?: (sessionId: string, artifactId: string) => void;
+    toggleSave?: (sessionId: string, artifactId: string) => void;
+    removeSaved?: (artifactId: string) => void;
     explainCode?: (code: string) => Promise<string | undefined>;
     refactorCode?: (code: string, instruction: string, onChunk?: (chunk: string) => void) => Promise<string | undefined>;
     onRefactorApply?: (newHtml: string) => void;
@@ -29,13 +40,82 @@ interface DrawerContentProps {
     onUpdateArtifactFiles?: (sessionId: string, artifactId: string, files: Record<string, string>) => void;
 }
 
+const FORMATS = [
+    { id: 'static', label: 'Static HTML', desc: 'Direct browser use' },
+    { id: 'nextjs', label: 'Next.js', desc: 'Modern App Router' },
+    { id: 'react', label: 'React', desc: 'Best Single Component' },
+    { id: 'vue', label: 'Vue', desc: 'SFC Version' },
+    { id: 'svelte', label: 'Svelte', desc: 'Reactive Component' },
+    { id: 'wix', label: 'Wix Velo', desc: 'For Wix Sites' },
+    { id: 'notion', label: 'Notion', desc: 'Markdown Embed' },
+];
+
+const AI_TOOLS = [
+    {
+        id: 'real-copy',
+        name: 'Real Content Injector',
+        description: 'Replaces all placeholder text and generic data with realistic, high-quality copy tailored to the component\'s purpose.',
+        prompt: 'Replace all placeholder text, "lorem ipsum", and generic content with realistic, engaging, and professional copy that fits the context of this UI. Keep the HTML structure identical.'
+    },
+    {
+        id: 'a11y-fix',
+        name: 'Accessibility Booster',
+        description: 'Analyzes the HTML and enhances it with proper ARIA labels, semantic roles, and better keyboard navigation support.',
+        prompt: 'Review the HTML for accessibility. Add missing aria-labels, alt text for images, ensure semantic HTML tags are used (like <nav>, <main>, <header>), and improve keyboard focus states. Maintain the original design.'
+    },
+    {
+        id: 'dark-mode',
+        name: 'Dark Mode Generator',
+        description: 'Automatically creates a beautiful high-contrast dark theme version of the component.',
+        prompt: 'Create a dark mode version of this UI. Use a deep, modern palette (like #09090b or #121212) with elegant high-contrast text and accents. Ensure it feels premium and easy on the eyes.'
+    },
+    {
+        id: 'mobile-opt',
+        name: 'Mobile Layout Optimizer',
+        description: 'Refines the Tailwind classes to ensure maximum layout fluidity and perfect responsiveness on all mobile devices.',
+        prompt: 'Optimize the responsiveness of this UI. Ensure all elements layout perfectly on small screens. Fix any horizontal scrolling, adjust padding for mobile, and make buttons thumb-friendly sizes. Use standard Tailwind responsive prefixes.'
+    },
+    {
+        id: 'clean-code',
+        name: 'Code Clean & Prep',
+        description: 'Refactors the code for better performance, removes redundant styles, and organizes the structure for production.',
+        prompt: 'Refactor this code to be cleaner and more production-ready. Remove any redundant CSS classes or inline styles. Group related Tailwind utilities. Ensure the structure is logical and well-organized while keeping the visual design identical.'
+    },
+    {
+        id: 'code-opt',
+        name: 'Logic Optimizer',
+        description: 'Refactors logic for better readability and efficiency, simplifying complex expressions.',
+        prompt: 'Review the underlying logic and structure. Simplify complex conditions, improve variable naming, and ensure the code follows best practices for efficiency and readability.'
+    },
+    {
+        id: 'perf-boost',
+        name: 'Performance Booster',
+        description: 'Optimizes asset loading and speeds up execution by reducing overhead.',
+        prompt: 'Optimize this component for performance. Focus on reducing DOM complexity, minimizing reflows, and ensuring efficient styling. If there are animations, make them hardware-accelerated.'
+    },
+    {
+        id: 'add-docs',
+        name: 'Documentation Pro',
+        description: 'Adds helpful comments and documentation headers to the code for better maintainability.',
+        prompt: 'Add clear, concise comments to the code. Include a header explaining the component\'s purpose and document any complex sections or specific Tailwind configurations used. Maintain the original code functionality.'
+    }
+];
+
 export default function DrawerContent({
     mode,
     data,
     isLoading,
     componentVariations,
+    savedArtifacts,
+    userApiKey,
+    setUserApiKey,
+    validateApiKey,
+    apiKeyStatus,
     onApplyVariation,
     onTemplateClick,
+    toggleFavorite,
+    toggleSave,
+    removeSaved,
     explainCode,
     refactorCode,
     onRefactorApply,
@@ -50,6 +130,36 @@ export default function DrawerContent({
     const [hasManuallySelected, setHasManuallySelected] = useState(false);
     const [fileCopyFeedback, setFileCopyFeedback] = useState(false);
 
+    const [localApiKey, setLocalApiKey] = useState(userApiKey || '');
+    const [isApiKeyHelpOpen, setIsApiKeyHelpOpen] = useState(false);
+    const [isValidating, setIsValidating] = useState(false);
+
+    // AI Assistant state
+    const [assistantMode, setAssistantMode] = useState<'none' | 'explain' | 'refactor'>('none');
+    const [assistantResponse, setAssistantResponse] = useState<string>('');
+    const [isAssistantLoading, setIsAssistantLoading] = useState(false);
+    const [refactorInstruction, setRefactorInstruction] = useState('');
+
+    // Recommended Pages state
+    const [recommendedPages, setRecommendedPages] = useState<RecommendedPage[]>([]);
+    const [isRecommendedLoading, setIsRecommendedLoading] = useState(false);
+    const [showExportMenu, setShowExportMenu] = useState(false);
+    const [exportFeedback, setExportFeedback] = useState<string | null>(null);
+
+    // Animations state
+    const [isAnimating, setIsAnimating] = useState(false);
+
+    // Multi-file state
+    const [activeFile, setActiveFile] = useState<string>('');
+    const [generatingFiles, setGeneratingFiles] = useState<Set<string>>(new Set());
+    const [exportedFiles, setExportedFiles] = useState<ExportedFiles>({});
+
+    const [vercelToken, setVercelToken] = useState('');
+    const [vercelProjectName, setVercelProjectName] = useState('my-flash-ui-project');
+    const [isVercelDeploying, setIsVercelDeploying] = useState(false);
+    const [vercelDeploymentResult, setVercelDeploymentResult] = useState<{ url: string } | null>(null);
+    const [vercelDeployError, setVercelDeployError] = useState<string | null>(null);
+
     // GitHub state
     const [githubConnected, setGithubConnected] = useState<boolean | null>(null);
     const [isDeploying, setIsDeploying] = useState(false);
@@ -58,16 +168,6 @@ export default function DrawerContent({
     const [repoName, setRepoName] = useState('');
     const [repoDescription, setRepoDescription] = useState('');
     const [isPrivate, setIsPrivate] = useState(false);
-
-    const formats = [
-        { id: 'static', label: 'Static HTML', desc: 'Direct browser use' },
-        { id: 'nextjs', label: 'Next.js', desc: 'Modern App Router' },
-        { id: 'react', label: 'React', desc: 'Best Single Component' },
-        { id: 'vue', label: 'Vue', desc: 'SFC Version' },
-        { id: 'svelte', label: 'Svelte', desc: 'Reactive Component' },
-        { id: 'wix', label: 'Wix Velo', desc: 'For Wix Sites' },
-        { id: 'notion', label: 'Notion', desc: 'Markdown Embed' },
-    ];
 
     useEffect(() => {
         if (data?.html) {
@@ -121,36 +221,78 @@ export default function DrawerContent({
                 setDownloadFormat(rec as any);
             }
         }
-    }, [data?.html, data?.prompt]);
-    
-    // AI Assistant state
-    const [assistantMode, setAssistantMode] = useState<'none' | 'explain' | 'refactor'>('none');
-    const [assistantResponse, setAssistantResponse] = useState<string>('');
-    const [isAssistantLoading, setIsAssistantLoading] = useState(false);
-    const [refactorInstruction, setRefactorInstruction] = useState('');
+    }, [data?.html, data?.prompt, hasManuallySelected]);
 
-    // Recommended Pages state
-    const [recommendedPages, setRecommendedPages] = useState<RecommendedPage[]>([]);
-    const [isRecommendedLoading, setIsRecommendedLoading] = useState(false);
-    const [showExportMenu, setShowExportMenu] = useState(false);
-    const [exportFeedback, setExportFeedback] = useState<string | null>(null);
+    const handleVercelDeploy = useCallback(async () => {
+        if (!vercelToken) {
+            setVercelDeployError('Vercel API Token is required');
+            return;
+        }
+        setIsVercelDeploying(true);
+        setVercelDeployError(null);
+        try {
+            const files = getExportedFiles(data.html, downloadFormat, data.additionalFiles);
+            const result = await deployToVercel(vercelToken, files, vercelProjectName);
+            setVercelDeploymentResult({ url: result.url });
+        } catch (err: any) {
+            setVercelDeployError(err.message || 'Deployment failed');
+        } finally {
+            setIsVercelDeploying(false);
+        }
+    }, [vercelToken, data?.html, downloadFormat, data?.additionalFiles, vercelProjectName]);
 
-    // Animations state
-    const [isAnimating, setIsAnimating] = useState(false);
+    const [templateSearch, setTemplateSearch] = useState('');
+    const [selectedTag, setSelectedTag] = useState<string | null>(null);
 
-    // Multi-file state
-    const [activeFile, setActiveFile] = useState<string>('');
-    const [generatingFiles, setGeneratingFiles] = useState<Set<string>>(new Set());
-    const [exportedFiles, setExportedFiles] = useState<ExportedFiles>({});
+    const allTags = useMemo(() => {
+        const tags = new Set<string>();
+        TEMPLATES.forEach(t => {
+            if ((t as Template).tags) {
+                (t as Template).tags!.forEach(tag => tags.add(tag));
+            }
+        });
+        return Array.from(tags).sort();
+    }, []);
 
-    const handleCopyRecommended = () => {
+    const filteredTemplates = useMemo(() => {
+        return TEMPLATES.filter(t => {
+            const matchesSearch = t.title.toLowerCase().includes(templateSearch.toLowerCase()) || 
+                                  t.description.toLowerCase().includes(templateSearch.toLowerCase());
+            const matchesTag = !selectedTag || (t as Template).tags?.includes(selectedTag);
+            return matchesSearch && matchesTag;
+        });
+    }, [templateSearch, selectedTag]);
+
+    const [isMagicLoading, setIsMagicLoading] = useState(false);
+    const [magicFeedback, setMagicFeedback] = useState<string | null>(null);
+
+    const handleApplyMagic = useCallback(async (tool: typeof AI_TOOLS[0]) => {
+        if (!refactorCode || !data?.html) return;
+        setIsMagicLoading(true);
+        setMagicFeedback(`Running ${tool.name}...`);
+        
+        try {
+            const result = await refactorCode(data.html, tool.prompt);
+            if (result && onRefactorApply) {
+                onRefactorApply(result);
+                setMagicFeedback('Magic applied successfully!');
+                setTimeout(() => setMagicFeedback(null), 3000);
+            }
+        } catch (e) {
+            setMagicFeedback('Magic failed. Try again.');
+        } finally {
+            setIsMagicLoading(false);
+        }
+    }, [refactorCode, data?.html, onRefactorApply]);
+
+    const handleCopyRecommended = useCallback(() => {
         const md = formatAsMarkdown(recommendedPages);
         navigator.clipboard.writeText(md);
         setExportFeedback('Copied Markdown!');
         setTimeout(() => setExportFeedback(null), 2000);
-    };
+    }, [recommendedPages]);
 
-    const handleDownloadFormat = async (format: 'md' | 'txt' | 'pdf' | 'doc') => {
+    const handleDownloadFormat = useCallback(async (format: 'md' | 'txt' | 'pdf' | 'doc') => {
         switch (format) {
             case 'md':
                 downloadAsMarkdown(recommendedPages);
@@ -166,7 +308,8 @@ export default function DrawerContent({
                 break;
         }
         setShowExportMenu(false);
-    };
+    }, [recommendedPages]);
+
 
     const isLoadingVariations = isLoading && mode === 'variations' && componentVariations.length === 0;
 
@@ -378,7 +521,7 @@ export default function DrawerContent({
                             <label>Export Format:</label>
                         </div>
                         <div className="format-grid">
-                            {formats.map((f) => (
+                            {FORMATS.map((f) => (
                                 <button
                                     key={f.id}
                                     className={`format-btn ${downloadFormat === f.id ? 'active' : ''} ${recommendedFormat === f.id ? 'recommended' : ''}`}
@@ -580,7 +723,60 @@ export default function DrawerContent({
                         </div>
                     </div>
 
-                    <pre className="code-block"><code>{exportedFiles[activeFile]}</code></pre>
+                    <div className="syntax-highlighter-wrapper">
+                        <SyntaxHighlighter 
+                            language={activeFile.endsWith('.tsx') || activeFile.endsWith('.ts') ? 'typescript' : 'html'} 
+                            style={vscDarkPlus}
+                            showLineNumbers={true}
+                            customStyle={{
+                                margin: 0,
+                                background: 'transparent',
+                                fontSize: '0.85rem',
+                                padding: '16px'
+                            }}
+                        >
+                            {exportedFiles[activeFile] || ''}
+                        </SyntaxHighlighter>
+                    </div>
+
+                    <div className="vercel-deploy-section">
+                        <div className="section-header">
+                            <BotIcon /> DEPLOY_TO_VERCEL
+                        </div>
+                        <div className="vercel-form">
+                            <input 
+                                type="password" 
+                                placeholder="Vercel API Token" 
+                                value={vercelToken}
+                                onChange={(e) => setVercelToken(e.target.value)}
+                                className="vercel-input"
+                            />
+                            <input 
+                                type="text" 
+                                placeholder="Project Name" 
+                                value={vercelProjectName}
+                                onChange={(e) => setVercelProjectName(e.target.value)}
+                                className="vercel-input"
+                            />
+                            <button 
+                                className="blueprint-btn deploy-btn"
+                                onClick={handleVercelDeploy}
+                                disabled={isVercelDeploying}
+                            >
+                                {isVercelDeploying ? <ThinkingIcon /> : <DownloadIcon />}
+                                {isVercelDeploying ? 'DEPLOYING...' : 'INITIALIZE_DEPLOYMENT'}
+                            </button>
+                        </div>
+                        {vercelDeployError && <div className="deploy-error">{vercelDeployError}</div>}
+                        {vercelDeploymentResult && (
+                            <div className="deploy-success">
+                                <p>Success! Your app is live at:</p>
+                                <a href={`https://${vercelDeploymentResult.url}`} target="_blank" rel="noreferrer">
+                                    {vercelDeploymentResult.url}
+                                </a>
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
 
@@ -688,6 +884,107 @@ export default function DrawerContent({
                 </div>
             )}
             
+            {mode === 'ai-tools' && (
+                <div className="ai-tools-wrapper">
+                    <div className="api-key-settings">
+                        <div className="settings-header">
+                            <div className="settings-title">
+                                Gemini API Configuration
+                                <button className="help-icon-btn" onClick={() => setIsApiKeyHelpOpen(!isApiKeyHelpOpen)} title="Help">
+                                    <InfoIcon />
+                                </button>
+                            </div>
+                            {apiKeyStatus?.quotaInfo && <div className="quota-display">{apiKeyStatus.quotaInfo}</div>}
+                        </div>
+
+                        {isApiKeyHelpOpen && (
+                            <div className="api-key-help">
+                                <p>To use your own Gemini API key:</p>
+                                <ol>
+                                    <li>Go to the <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="help-link">Google AI Studio API Key page</a>.</li>
+                                    <li>Create or copy your API key.</li>
+                                    <li>Paste it below and click "Save & Validate".</li>
+                                </ol>
+                                <p className="help-note">Your key is stored securely in your browser's local storage.</p>
+                            </div>
+                        )}
+
+                        <div className="api-key-input-group">
+                            <div className="input-with-icon">
+                                <input 
+                                    type="password" 
+                                    placeholder="Paste your Gemini API Key here..." 
+                                    value={localApiKey}
+                                    onChange={(e) => setLocalApiKey(e.target.value)}
+                                    className={`api-key-input ${apiKeyStatus?.isValid === true ? 'valid' : ''} ${apiKeyStatus?.isValid === false ? 'invalid' : ''}`}
+                                />
+                                {apiKeyStatus?.isValid === true && <div className="status-icon success"><CheckIcon /></div>}
+                                {apiKeyStatus?.isValid === false && <div className="status-icon error"><AlertCircleIcon /></div>}
+                            </div>
+                            <button 
+                                className="save-api-key-btn"
+                                onClick={async () => {
+                                    setIsValidating(true);
+                                    const success = await validateApiKey?.(localApiKey);
+                                    if (success) {
+                                        setUserApiKey?.(localApiKey);
+                                    }
+                                    setIsValidating(false);
+                                }}
+                                disabled={isValidating || !localApiKey}
+                            >
+                                {isValidating ? <ThinkingIcon /> : 'Save & Validate'}
+                            </button>
+                            {userApiKey && (
+                                <button 
+                                    className="clear-api-key-btn"
+                                    onClick={() => {
+                                        setLocalApiKey('');
+                                        setUserApiKey?.('');
+                                    }}
+                                    title="Clear Key"
+                                >
+                                    <XIcon />
+                                </button>
+                            )}
+                        </div>
+                        {apiKeyStatus?.error && <div className="api-key-error">{apiKeyStatus.error}</div>}
+                    </div>
+
+                    <div className="magic-status-bar">
+                        <div className="status-title">
+                            <MagicWandIcon /> AI MAGIC TOOLS
+                        </div>
+                        {magicFeedback && <div className="magic-feedback">{magicFeedback}</div>}
+                    </div>
+
+                    {isMagicLoading ? (
+                        <div className="loading-state">
+                            <ThinkingIcon /> 
+                            {magicFeedback || 'Consulting the AI spirits...'}
+                        </div>
+                    ) : (
+                        <div className="sexy-grid">
+                            {AI_TOOLS.map((tool) => (
+                                <div 
+                                    key={tool.id} 
+                                    className="sexy-card ai-tool-card"
+                                    onClick={() => handleApplyMagic(tool)}
+                                >
+                                    <div className="sexy-label" style={{borderTop: 'none', background: 'transparent', textAlign: 'left', padding: '20px'}}>
+                                        <div style={{fontSize: '1rem', marginBottom: '8px', color: '#fff', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '10px'}}>
+                                            {tool.name}
+                                        </div>
+                                        <div style={{fontSize: '0.85rem', opacity: 0.6, lineHeight: 1.5}}>{tool.description}</div>
+                                        <div className="magic-action-hint">Click to Apply Magic</div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
             {mode === 'variations' && (
                 <div className="sexy-grid">
                     {componentVariations.map((v, i) => (
@@ -702,15 +999,109 @@ export default function DrawerContent({
             )}
 
             {mode === 'templates' && (
-                <div className="sexy-grid">
-                    {TEMPLATES.map((t, i) => (
-                        <div key={i} className="sexy-card template-card" onClick={() => onTemplateClick(t.prompt)}>
-                            <div className="sexy-label" style={{borderTop: 'none', background: 'transparent', textAlign: 'left', padding: '20px'}}>
-                                <div style={{fontSize: '1rem', marginBottom: '6px', color: '#fff', fontWeight: 600}}>{t.title}</div>
-                                <div style={{fontSize: '0.85rem', opacity: 0.7, lineHeight: 1.4}}>{t.description}</div>
-                            </div>
+                <div className="templates-wrapper">
+                    <div className="templates-filter-bar">
+                        <div className="template-search-container">
+                            <SearchIcon />
+                            <input 
+                                type="text" 
+                                placeholder="Search templates..." 
+                                value={templateSearch}
+                                onChange={(e) => setTemplateSearch(e.target.value)}
+                            />
                         </div>
-                    ))}
+                        <div className="template-tags-scroll">
+                            <button 
+                                className={`tag-btn ${!selectedTag ? 'active' : ''}`}
+                                onClick={() => setSelectedTag(null)}
+                            >
+                                All
+                            </button>
+                            {allTags.map(tag => (
+                                <button 
+                                    key={tag}
+                                    className={`tag-btn ${selectedTag === tag ? 'active' : ''}`}
+                                    onClick={() => setSelectedTag(tag)}
+                                >
+                                    {tag}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    
+                    <div className="sexy-grid">
+                        {filteredTemplates.map((t, i) => (
+                            <div key={i} className="sexy-card template-card" onClick={() => onTemplateClick(t.prompt)}>
+                                <div className="sexy-label" style={{borderTop: 'none', background: 'transparent', textAlign: 'left', padding: '20px'}}>
+                                    <div style={{fontSize: '1.1rem', marginBottom: '8px', color: '#fff', fontWeight: 700}}>{t.title}</div>
+                                    <div style={{fontSize: '0.85rem', opacity: 0.6, lineHeight: 1.5, marginBottom: '12px'}}>{t.description}</div>
+                                    <div className="template-tags">
+                                        {(t as Template).tags?.map(tag => (
+                                            <span key={tag} className="mini-tag">{tag}</span>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    {filteredTemplates.length === 0 && (
+                        <div className="no-results">
+                            No templates found matching your criteria.
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {mode === 'library' && (
+                <div className="library-wrapper">
+                    {savedArtifacts.length === 0 ? (
+                        <div className="no-results" style={{padding: '60px 20px'}}>
+                            <BookmarkIcon />
+                            <div style={{marginTop: '16px', fontSize: '1.1rem', fontWeight: 600}}>Your Library is empty</div>
+                            <div style={{fontSize: '0.85rem', opacity: 0.6, marginTop: '8px'}}>Save generations to access them here later.</div>
+                        </div>
+                    ) : (
+                        <div className="library-grid">
+                            {savedArtifacts.map((artifact) => (
+                                <div key={artifact.id} className="library-item">
+                                    <div className="library-item-preview">
+                                        <iframe 
+                                            srcDoc={artifact.html} 
+                                            title={artifact.styleName} 
+                                            sandbox="allow-scripts allow-same-origin"
+                                        />
+                                        <div className="library-item-overlay">
+                                            <button 
+                                                className="library-action-btn"
+                                                onClick={() => removeSaved?.(artifact.id)}
+                                                title="Remove from Library"
+                                            >
+                                                <XIcon />
+                                            </button>
+                                            <button 
+                                                className="library-action-btn primary"
+                                                onClick={() => onApplyVariation(artifact.html)}
+                                                title="View/Restore"
+                                            >
+                                                Restore
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="library-item-info">
+                                        <div className="info-main">
+                                            <span className="style-badge">{artifact.styleName}</span>
+                                            {artifact.isFavorite && <StarFilledIcon style={{color: '#f59e0b'}} />}
+                                        </div>
+                                        <div className="info-meta">
+                                            {Object.keys(artifact.additionalFiles || {}).length > 0 && 
+                                                <span>{Object.keys(artifact.additionalFiles || {}).length} files</span>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             )}
         </>
