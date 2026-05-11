@@ -9,6 +9,23 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 
+// Silence benign WebSocket errors from Vite HMR
+if (typeof window !== 'undefined') {
+  const originalError = console.error;
+  console.error = (...args: any[]) => {
+    if (args[0] && typeof args[0] === 'string' && args[0].includes('[vite] failed to connect to websocket')) {
+      return;
+    }
+    originalError.apply(console, args);
+  };
+
+  window.addEventListener('unhandledrejection', (event) => {
+    if (event.reason && (event.reason.message?.includes('WebSocket closed without opened') || (typeof event.reason === 'string' && event.reason.includes('WebSocket closed without opened')))) {
+      event.preventDefault();
+    }
+  });
+}
+
 import { useGenAI } from './hooks/useGenAI';
 import { useNavigation } from './hooks/useNavigation';
 import { INITIAL_PLACEHOLDERS } from './constants';
@@ -269,39 +286,41 @@ function App() {
             created by @ammaar
         </a>
 
-        <button 
-            className="features-button"
-            onClick={() => setShowFeatures(true)}
-            title="Planned Features"
-        >
-            Features
-        </button>
-
-        <button 
-            className="templates-button"
-            onClick={() => setDrawerState({ isOpen: true, mode: 'templates', title: 'Templates', data: null })}
-            title="Browse Templates"
-        >
-            Templates
-        </button>
-
-        <button 
-            className="library-button"
-            onClick={handleShowLibrary}
-            title="Your Library"
-        >
-            <BookmarkFilledIcon /> Library
-        </button>
-
-        {hasStarted && (
+        <div className="nav-menu">
             <button 
-                className="reset-button" 
-                onClick={handleReset}
-                title="Start Over"
+                className="nav-btn"
+                onClick={() => setShowFeatures(true)}
+                title="Planned Features"
             >
-                <HomeIcon />
+                Features
             </button>
-        )}
+
+            <button 
+                className="nav-btn"
+                onClick={() => setDrawerState({ isOpen: true, mode: 'templates', title: 'Templates', data: null })}
+                title="Browse Templates"
+            >
+                Templates
+            </button>
+
+            <button 
+                className="nav-btn"
+                onClick={handleShowLibrary}
+                title="Your Library"
+            >
+                <BookmarkFilledIcon /> Library
+            </button>
+
+            {hasStarted && (
+                <button 
+                    className="nav-btn reset-btn-small" 
+                    onClick={handleReset}
+                    title="Start Over"
+                >
+                    <HomeIcon />
+                </button>
+            )}
+        </div>
 
         {showFeatures && <FeaturesList onClose={() => setShowFeatures(false)} />}
 
@@ -316,6 +335,7 @@ function App() {
                 isLoading={isLoading}
                 componentVariations={componentVariations}
                 savedArtifacts={savedArtifacts}
+                sessions={sessions}
                 userApiKey={userApiKey}
                 setUserApiKey={setUserApiKey}
                 validateApiKey={validateApiKey}

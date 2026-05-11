@@ -27,7 +27,10 @@ async function startServer() {
     // Determine redirect URI - using window.location.origin on client is best, 
     // but on server we can use the request host header or a predefined one.
     // As per skill guidelines, the client should ideally pass this or we construct it.
-    const redirectUri = `${req.protocol}://${req.get('host')}/auth/callback`;
+    // Use the protocol from the X-Forwarded-Proto header if available (behind proxy)
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+    const host = req.get('host');
+    const redirectUri = `${protocol}://${host}/auth/callback`;
     
     const params = new URLSearchParams({
       client_id: clientId,

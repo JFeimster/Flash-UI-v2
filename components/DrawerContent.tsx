@@ -8,7 +8,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { ThinkingIcon, DownloadIcon, BotIcon, SparklesIcon, LayoutIcon, CodeIcon, CopyIcon, ChevronDownIcon, MagicWandIcon, SearchIcon, StarIcon, StarFilledIcon, BookmarkIcon, BookmarkFilledIcon, HeartIcon, HeartFilledIcon, XIcon, InfoIcon, CheckIcon, AlertCircleIcon } from './Icons';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { Artifact, ComponentVariation, RecommendedPage, AnimationStyle, Template } from '../types';
+import { Artifact, ComponentVariation, RecommendedPage, AnimationStyle, Template, Session } from '../types';
 import { TEMPLATES } from '../templates';
 import { ANIMATION_STYLES } from '../animations';
 import { downloadCode, downloadZip, getExportedFiles, ExportedFiles } from '../utils/export';
@@ -21,6 +21,7 @@ interface DrawerContentProps {
     isLoading: boolean;
     componentVariations: ComponentVariation[];
     savedArtifacts: Artifact[];
+    sessions?: Session[];
     userApiKey?: string;
     setUserApiKey?: (key: string) => void;
     validateApiKey?: (key: string) => Promise<boolean>;
@@ -107,6 +108,7 @@ export default function DrawerContent({
     isLoading,
     componentVariations,
     savedArtifacts,
+    sessions = [],
     userApiKey,
     setUserApiKey,
     validateApiKey,
@@ -310,6 +312,25 @@ export default function DrawerContent({
         setShowExportMenu(false);
     }, [recommendedPages]);
 
+
+    const allSavedAndFavorites = useMemo(() => {
+        // Collect all favorites from sessions
+        const favorites = sessions.flatMap(s => 
+            s.artifacts
+                .filter(a => a.isFavorite)
+                .map(a => ({ ...a, sessionId: s.id } as Artifact & { sessionId: string }))
+        );
+        
+        // Combine with saved artifacts, avoiding duplicates by ID
+        const combined = [...savedArtifacts] as (Artifact & { sessionId?: string })[];
+        favorites.forEach(fav => {
+            if (!combined.find(c => c.id === fav.id)) {
+                combined.push(fav);
+            }
+        });
+        
+        return combined.sort((a, b) => (b.isFavorite ? 1 : 0) - (a.isFavorite ? 1 : 0));
+    }, [sessions, savedArtifacts]);
 
     const isLoadingVariations = isLoading && mode === 'variations' && componentVariations.length === 0;
 
@@ -1054,15 +1075,24 @@ export default function DrawerContent({
 
             {mode === 'library' && (
                 <div className="library-wrapper">
-                    {savedArtifacts.length === 0 ? (
+                    {allSavedAndFavorites.length === 0 ? (
                         <div className="no-results" style={{padding: '60px 20px'}}>
-                            <BookmarkIcon />
-                            <div style={{marginTop: '16px', fontSize: '1.1rem', fontWeight: 600}}>Your Library is empty</div>
-                            <div style={{fontSize: '0.85rem', opacity: 0.6, marginTop: '8px'}}>Save generations to access them here later.</div>
+                            <div className="empty-library-icons">
+                                <BookmarkIcon />
+                                <HeartIcon />
+                            </div>
+                            <div style={{marginTop: '24px', fontSize: '1.2rem', fontWeight: 600, color: '#fff'}}>Your Library is empty</div>
+                            <div className="library-help-box">
+                                <p>There are two ways to keep your designs:</p>
+                                <ul>
+                                    <li><BookmarkIcon /> <strong>Save:</strong> Click the bookmark icon to add a version permanently to your Library.</li>
+                                    <li><HeartIcon /> <strong>Favorite:</strong> Click the heart/star icon to mark items you like; these will also appear here!</li>
+                                </ul>
+                            </div>
                         </div>
                     ) : (
                         <div className="library-grid">
-                            {savedArtifacts.map((artifact) => (
+                            {allSavedAndFavorites.map((artifact) => (
                                 <div key={artifact.id} className="library-item">
                                     <div className="library-item-preview">
                                         <iframe 
@@ -1073,7 +1103,13 @@ export default function DrawerContent({
                                         <div className="library-item-overlay">
                                             <button 
                                                 className="library-action-btn"
-                                                onClick={() => removeSaved?.(artifact.id)}
+                                                onClick={() => {
+                                                    if (artifact.isSaved) {
+                                                        removeSaved?.(artifact.id);
+                                                    } else if (artifact.sessionId) {
+                                                        toggleFavorite?.(artifact.sessionId, artifact.id);
+                                                    }
+                                                }}
                                                 title="Remove from Library"
                                             >
                                                 <XIcon />
@@ -1090,7 +1126,10 @@ export default function DrawerContent({
                                     <div className="library-item-info">
                                         <div className="info-main">
                                             <span className="style-badge">{artifact.styleName}</span>
-                                            {artifact.isFavorite && <StarFilledIcon style={{color: '#f59e0b'}} />}
+                                            <div className="info-badges">
+                                                {artifact.isFavorite && <HeartFilledIcon style={{color: '#ff4757', width: '14px', height: '14px'}} />}
+                                                {artifact.isSaved && <BookmarkFilledIcon style={{color: '#6b21ff', width: '14px', height: '14px'}} />}
+                                            </div>
                                         </div>
                                         <div className="info-meta">
                                             {Object.keys(artifact.additionalFiles || {}).length > 0 && 
