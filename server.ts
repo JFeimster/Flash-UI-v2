@@ -222,6 +222,40 @@ async function startServer() {
     res.status(202).json({ received: true });
   });
 
+  // === URL Context Proxy ===
+  app.post("/api/proxy/fetch-url", async (req, res) => {
+    const { url } = req.body;
+    if (!url) return res.status(400).json({ error: "URL is required" });
+
+    try {
+      const response = await axios.get(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        },
+        timeout: 10000
+      });
+      
+      // Simple text extraction (strip scripts and styles)
+      let html = response.data;
+      if (typeof html === 'string') {
+        const text = html
+          .replace(/<script\b[^>]*>([\s\S]*?)<\/script>/gmi, '')
+          .replace(/<style\b[^>]*>([\s\S]*?)<\/style>/gmi, '')
+          .replace(/<[^>]*>/gm, ' ')
+          .replace(/\s+/gm, ' ')
+          .trim()
+          .substring(0, 10000); // Truncate to avoid huge payloads
+
+        return res.json({ content: text, url });
+      }
+      
+      res.json({ content: "Found non-text content", url });
+    } catch (error: any) {
+      console.error("Proxy Error:", error.message);
+      res.status(500).json({ error: "Failed to fetch URL", details: error.message });
+    }
+  });
+
   // === Vite Middleware ===
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

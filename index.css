@@ -1,5 +1,62 @@
 
-/* index.css */
+/* === URL Context UI === */
+.url-input-container {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(9, 9, 11, 0.4);
+}
+
+.url-context-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    font-size: 0.75rem;
+    font-family: var(--font-mono);
+    color: #f472b6; /* Pink 400 */
+    outline: none;
+}
+
+.url-context-input::placeholder {
+    color: rgba(255, 255, 255, 0.2);
+}
+
+.url-clear {
+    padding: 0.25rem;
+    color: rgba(255, 255, 255, 0.4);
+    transition: color 0.2s ease;
+    cursor: pointer;
+}
+
+.url-clear:hover {
+    color: #ffffff;
+}
+
+.attachment-button.active {
+    color: #ec4899; /* Pink 500 */
+    background: rgba(236, 72, 153, 0.1);
+}
+
+.input-field-container.flex-col {
+    display: flex;
+    flex-direction: column;
+}
+
+.input-dashboard-main {
+    transition: all 0.3s ease;
+}
+
+.animate-in {
+    animation: animate-in 0.3s ease-out;
+}
+
+@keyframes animate-in {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
@@ -428,6 +485,107 @@ html, body {
     width: 100%;
     padding-right: 8px;
     gap: 8px;
+}
+
+/* Attachment Cards */
+.attachment-preview-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.attachment-preview-card {
+    position: relative;
+    width: 60px;
+    height: 60px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--accent-bg);
+    border: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s ease;
+}
+
+.attachment-preview-card.is-image {
+    width: 60px;
+}
+
+.attachment-preview-card:not(.is-image) {
+    width: 140px;
+    padding: 8px;
+}
+
+.attachment-preview-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent-primary);
+}
+
+.attachment-preview-card img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.file-preview-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    overflow: hidden;
+}
+
+.file-info {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.file-name {
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.file-size {
+    font-size: 0.6rem;
+    color: var(--text-secondary);
+}
+
+.attachment-remove {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #ef4444;
+    color: white;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 2;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.attachment-preview-card:hover .attachment-remove {
+    opacity: 1;
+}
+
+.attachment-remove svg {
+    width: 10px;
+    height: 10px;
 }
 
 /* Common Utility Animations */

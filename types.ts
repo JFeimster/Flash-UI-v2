@@ -3,6 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 
+export interface Attachment {
+    id: string;
+    name: string;
+    mimeType: string;
+    data: string; // base64
+    size: number;
+}
+
 export interface Artifact {
   id: string;
   styleName: string;
@@ -18,6 +26,8 @@ export interface Session {
     prompt: string;
     timestamp: number;
     artifacts: Artifact[];
+    attachments?: Attachment[];
+    contextUrl?: string;
 }
 
 export interface ComponentVariation { name: string; html: string; }

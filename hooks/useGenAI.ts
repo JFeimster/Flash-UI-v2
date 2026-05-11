@@ -7,7 +7,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { GoogleGenAI, GenerateContentResponse } from '@google/genai';
 import { generateId, withRetry } from '../utils';
-import { Session, Artifact, ComponentVariation, SuggestedComponent } from '../types';
+import { Session, Artifact, ComponentVariation, SuggestedComponent, Attachment } from '../types';
 
 const STORAGE_KEY = 'flash_ui_sessions_v1';
 const SAVED_KEY = 'flash_ui_saved_v1';
@@ -192,14 +192,31 @@ Required JSON Output Format (stream ONE object per line):
         }
     }, []);
 
-    const sendMessage = useCallback(async (promptText: string, attachments: { mimeType: string, data: string }[] = []) => {
+    const sendMessage = useCallback(async (promptText: string, attachments: Attachment[] = [], contextUrl?: string) => {
         const trimmedInput = promptText.trim();
-        if (!trimmedInput && attachments.length === 0) return;
+        if (!trimmedInput && attachments.length === 0 && !contextUrl) return;
 
         setIsLoading(true);
         
         const baseTime = Date.now();
         const sessionId = generateId();
+
+        let fetchedContext = '';
+        if (contextUrl) {
+            try {
+                const response = await fetch('/api/proxy/fetch-url', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: contextUrl })
+                });
+                const data = await response.json();
+                if (data.content) {
+                    fetchedContext = data.content;
+                }
+            } catch (e) {
+                console.error("Failed to fetch context URL:", e);
+            }
+        }
 
         const placeholderArtifacts: Artifact[] = Array(3).fill(null).map((_, i) => ({
             id: `${sessionId}_${i}`,
@@ -210,9 +227,11 @@ Required JSON Output Format (stream ONE object per line):
 
         const newSession: Session = {
             id: sessionId,
-            prompt: trimmedInput || (attachments.length > 0 ? "Generate UI from image" : ""),
+            prompt: trimmedInput || (contextUrl ? `UI based on ${contextUrl}` : (attachments.length > 0 ? `Generate UI using ${attachments.length} attachment(s)` : "")),
             timestamp: baseTime,
-            artifacts: placeholderArtifacts
+            artifacts: placeholderArtifacts,
+            attachments: attachments,
+            contextUrl: contextUrl
         };
 
         setSessions(prev => [...prev, newSession]);
@@ -220,7 +239,7 @@ Required JSON Output Format (stream ONE object per line):
         try {
             const ai = getAiClient();
 
-            const stylePrompt = `Based on this request: "${trimmedInput || 'UI from image'}", suggest 3 distinct visual names/styles. Return ONLY a JSON array of strings. e.g. ["Cyber Grid", "Glass Echo", "Paper Grain"]. No trademarks.`;
+            const stylePrompt = `Based on this request: "${trimmedInput || 'UI from attachments'}", suggest 3 distinct visual names/styles. Return ONLY a JSON array of strings. e.g. ["Cyber Grid", "Glass Echo", "Paper Grain"]. No trademarks.`;
 
             // Wrap style generation with retry logic
             const styleResponse = await withRetry(() => ai.models.generateContent({
@@ -241,15 +260,31 @@ Required JSON Output Format (stream ONE object per line):
 
             const generateArtifact = async (artifact: Artifact, styleInstruction: string) => {
                 try {
-                    const prompt = `Create a high-fidelity UI component. 
-User Request: "${trimmedInput || 'Generate a UI based on the provided images'}". 
-Style Inspiration: ${styleInstruction}. 
-If images are provided, analyze their layout, colors, and components to recreate a functional and beautiful web version.
-Return ONLY raw HTML/CSS. No Markdown, no explanations.`;
+                    const prompt = `
+You are a master UI Engineer. Create a high-fidelity, production-ready UI component.
+
+USER REQUEST: "${trimmedInput || (contextUrl ? `Replicate or take inspiration from the site at ${contextUrl}` : 'Create a UI based on the attached files')}"
+STYLE INSPIRATION: ${styleInstruction}
+
+${fetchedContext ? `REFERENCE SITE CONTENT (MARKKDOWN/TEXT):
+${fetchedContext}
+` : ''}
+
+ATTACHED SOURCE FILES CONTEXT:
+${attachments.length > 0 ? `The user has attached ${attachments.length} files to provide context. 
+These files may include images for layout inspiration, text files for content, data files (CSV/JSON) for sample data, or source code (HTML/CSS/JS) for functional requirements.
+Analyze all provided parts and integrate their essence into the final component.` : 'No additional files attached.'}
+
+STRICT REQUIREMENTS:
+- Return ONLY raw HTML/CSS. 
+- Ensure it is a complete, standalone component.
+- Match the visual vibe of the Style Inspiration.
+- No Markdown, no explanations, no chat commentary.
+`.trim();
                     
                     const parts: any[] = [{ text: prompt }];
                     
-                    // Add images if present
+                    // Add all attachments as inlineData parts
                     attachments.forEach(att => {
                         parts.push({
                             inlineData: {
@@ -554,7 +589,7 @@ Return ONLY a JSON array of objects with the following structure:
         }
     }, []);
 
-    const reviseArtifact = useCallback(async (sessionId: string, artifactId: string, instruction: string) => {
+    const reviseArtifact = useCallback(async (sessionId: string, artifactId: string, instruction: string, attachments: Attachment[] = [], contextUrl?: string) => {
         const session = sessions.find(s => s.id === sessionId);
         const artifact = session?.artifacts.find(a => a.id === artifactId);
         if (!session || !artifact) return;
@@ -568,25 +603,60 @@ Return ONLY a JSON array of objects with the following structure:
         } : s));
 
         try {
+            let fetchedContext = '';
+            if (contextUrl) {
+                try {
+                    const response = await fetch('/api/proxy/fetch-url', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url: contextUrl })
+                    });
+                    const data = await response.json();
+                    if (data.content) {
+                        fetchedContext = data.content;
+                    }
+                } catch (e) {
+                    console.error("Failed to fetch context URL:", e);
+                }
+            }
+
             const ai = getAiClient();
             const prompt = `
 You are revising an existing UI component.
+
 BASE CODE:
 \`\`\`html
 ${artifact.html}
 \`\`\`
 
-USER INSTRUCTION: "${instruction}"
+USER INSTRUCTION: "${instruction || (contextUrl ? `Update the component using the reference site at ${contextUrl} as inspiration` : 'See attached files for revision details')}"
 
-YOUR TASK:
-Refactor the BASE CODE strictly based on the instruction.
-Ensure the design remains consistent.
-Return ONLY raw updated HTML/CSS. No Markdown, no explanations.
-            `.trim();
+${fetchedContext ? `REFERENCE SITE CONTENT:
+${fetchedContext}
+` : ''}
+
+ATTACHED CONTEXT FILES:
+${attachments.length > 0 ? `The user has provided ${attachments.length} additional files to guide this revision. 
+Analyze these files (images, documents, or code) and apply the requested changes to the BASE CODE while maintaining visual and functional consistency.` : 'No additional files provided.'}
+
+STRICT REQUIREMENTS:
+- Return ONLY raw updated HTML/CSS. 
+- No Markdown, no explanations, no chat commentary.
+`.trim();
+
+            const parts: any[] = [{ text: prompt }];
+            attachments.forEach(att => {
+                parts.push({
+                    inlineData: {
+                        mimeType: att.mimeType,
+                        data: att.data
+                    }
+                });
+            });
 
             const responseStream = await withRetry(() => ai.models.generateContentStream({
                 model: 'gemini-3-flash-preview',
-                contents: [{ parts: [{ text: prompt }], role: 'user' }],
+                contents: [{ parts, role: 'user' }],
             })) as any;
 
             let accumulatedHtml = '';

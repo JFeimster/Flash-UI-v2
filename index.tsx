@@ -12,24 +12,46 @@ import ReactDOM from 'react-dom/client';
 // Silence benign WebSocket errors from Vite HMR
 if (typeof window !== 'undefined') {
   const originalError = console.error;
+  const originalWarn = console.warn;
+  const originalDebug = console.debug;
+
+  const isBenignViteError = (msg: any) => {
+    if (typeof msg !== 'string') return false;
+    return (
+      msg.includes('[vite] failed to connect to websocket') ||
+      msg.includes('WebSocket closed without opened') ||
+      msg.includes('[vite] connecting...')
+    );
+  };
+
   console.error = (...args: any[]) => {
-    if (args[0] && typeof args[0] === 'string' && args[0].includes('[vite] failed to connect to websocket')) {
-      return;
-    }
+    if (args.some(isBenignViteError)) return;
     originalError.apply(console, args);
   };
 
+  console.warn = (...args: any[]) => {
+    if (args.some(isBenignViteError)) return;
+    originalWarn.apply(console, args);
+  };
+
+  console.debug = (...args: any[]) => {
+    if (args.some(isBenignViteError)) return;
+    originalDebug.apply(console, args);
+  };
+
   window.addEventListener('unhandledrejection', (event) => {
-    if (event.reason && (event.reason.message?.includes('WebSocket closed without opened') || (typeof event.reason === 'string' && event.reason.includes('WebSocket closed without opened')))) {
+    const msg = event.reason?.message || (typeof event.reason === 'string' ? event.reason : '');
+    if (isBenignViteError(msg)) {
       event.preventDefault();
+      event.stopPropagation();
     }
-  });
+  }, true);
 }
 
 import { useGenAI } from './hooks/useGenAI';
 import { useNavigation } from './hooks/useNavigation';
 import { INITIAL_PLACEHOLDERS } from './constants';
-import { SuggestedComponent } from './types';
+import { SuggestedComponent, Attachment } from './types';
 
 import DottedGlowBackground from './components/DottedGlowBackground';
 import SideDrawer from './components/SideDrawer';
@@ -133,15 +155,15 @@ function App() {
     });
   }, []);
 
-  const handleSendMessage = useCallback((attachments: { mimeType: string, data: string }[] = []) => {
-    if (inputValue.trim() || attachments.length > 0) {
+  const handleSendMessage = useCallback((attachments: Attachment[] = [], contextUrl?: string) => {
+    if (inputValue.trim() || attachments.length > 0 || contextUrl) {
         if (currentSession && focusedArtifactIndex !== null) {
             // Revision Mode
             const artifact = currentSession.artifacts[focusedArtifactIndex];
-            reviseArtifact(currentSession.id, artifact.id, inputValue);
+            reviseArtifact(currentSession.id, artifact.id, inputValue, attachments, contextUrl);
         } else {
             // New generation
-            sendMessage(inputValue, attachments);
+            sendMessage(inputValue, attachments, contextUrl);
             setFocusedArtifactIndex(null); 
         }
         setSuggestions([]); // Clear suggestions on new send
