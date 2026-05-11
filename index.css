@@ -2137,6 +2137,55 @@ html, body {
     font-family: var(--font-sans);
 }
 
+.styled-textarea {
+    resize: none;
+    line-height: 1.5;
+    min-height: 48px;
+    transition: height 0.3s ease;
+    padding: 12px 16px;
+}
+
+.input-field-container.expanded .styled-textarea {
+    min-height: 150px;
+}
+
+.expand-button {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.expand-button:hover, .expand-button.active {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.revision-mode-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(107, 33, 255, 0.15);
+    border: 1px solid var(--neon-accent);
+    color: var(--neon-accent);
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 12px;
+    width: fit-content;
+}
+
 .input-actions-fixed {
     display: flex;
     align-items: center;

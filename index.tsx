@@ -62,6 +62,7 @@ function App() {
     isLoading, 
     componentVariations, 
     sendMessage, 
+    reviseArtifact,
     generateVariations, 
     updateSessionArtifact,
     updateSessionArtifactFiles,
@@ -117,12 +118,19 @@ function App() {
 
   const handleSendMessage = useCallback((attachments: { mimeType: string, data: string }[] = []) => {
     if (inputValue.trim() || attachments.length > 0) {
-        sendMessage(inputValue, attachments);
+        if (currentSession && focusedArtifactIndex !== null) {
+            // Revision Mode
+            const artifact = currentSession.artifacts[focusedArtifactIndex];
+            reviseArtifact(currentSession.id, artifact.id, inputValue);
+        } else {
+            // New generation
+            sendMessage(inputValue, attachments);
+            setFocusedArtifactIndex(null); 
+        }
         setSuggestions([]); // Clear suggestions on new send
         setInputValue('');
-        setFocusedArtifactIndex(null); 
     }
-  }, [inputValue, sendMessage, setFocusedArtifactIndex]);
+  }, [inputValue, sendMessage, reviseArtifact, currentSession, focusedArtifactIndex, setFocusedArtifactIndex]);
 
   const handleSuggestionClick = useCallback((suggestion: SuggestedComponent) => {
       setInputValue(suggestion.prompt);
@@ -422,9 +430,11 @@ function App() {
                 currentPrompt={currentSession?.prompt}
                 onSend={handleSendMessage}
                 onTemplateClick={() => setDrawerState({ isOpen: true, mode: 'templates', title: 'Templates', data: null })}
-                inputRef={inputRef}
+                inputRef={inputRef as any}
                 suggestions={suggestions}
                 onSuggestionClick={handleSuggestionClick}
+                isRevisionMode={currentSession !== null && focusedArtifactIndex !== null}
+                artifactName={currentSession && focusedArtifactIndex !== null ? currentSession.artifacts[focusedArtifactIndex].styleName : undefined}
             />
         </div>
     </>

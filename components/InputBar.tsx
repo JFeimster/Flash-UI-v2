@@ -6,7 +6,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenAI } from '@google/genai';
-import { LayoutIcon, ThinkingIcon, ArrowUpIcon, AttachmentIcon, XIcon, SparklesIcon } from './Icons';
+import { LayoutIcon, ThinkingIcon, ArrowUpIcon, AttachmentIcon, XIcon, SparklesIcon, MagicWandIcon } from './Icons';
 import { INITIAL_PLACEHOLDERS } from '../constants';
 import { SuggestedComponent } from '../types';
 
@@ -17,9 +17,11 @@ interface InputBarProps {
     currentPrompt?: string;
     onSend: (attachments?: { mimeType: string, data: string }[]) => void;
     onTemplateClick: () => void;
-    inputRef: React.RefObject<HTMLInputElement>;
+    inputRef: React.RefObject<HTMLTextAreaElement>;
     suggestions: SuggestedComponent[];
     onSuggestionClick: (suggestion: SuggestedComponent) => void;
+    isRevisionMode?: boolean;
+    artifactName?: string;
 }
 
 export default function InputBar({ 
@@ -31,11 +33,14 @@ export default function InputBar({
     onTemplateClick,
     inputRef,
     suggestions,
-    onSuggestionClick
+    onSuggestionClick,
+    isRevisionMode,
+    artifactName
 }: InputBarProps) {
     const [placeholderIndex, setPlaceholderIndex] = useState(0);
     const [placeholders, setPlaceholders] = useState<string[]>(INITIAL_PLACEHOLDERS);
     const [attachments, setAttachments] = useState<{ mimeType: string, data: string }[]>([]);
+    const [isExpanded, setIsExpanded] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Cycle placeholders
@@ -78,10 +83,16 @@ export default function InputBar({
         setTimeout(fetchDynamicPlaceholders, 1000);
     }, []);
 
-    const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-        if (event.key === 'Enter' && !isLoading) {
-          event.preventDefault();
-          handleSend();
+    const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (event.key === 'Enter') {
+          if (event.shiftKey) {
+            // Allow new line
+            return;
+          }
+          if (!isLoading) {
+            event.preventDefault();
+            handleSend();
+          }
         } else if (event.key === 'Tab' && !inputValue && !isLoading) {
             event.preventDefault();
             setInputValue(placeholders[placeholderIndex]);
@@ -125,6 +136,12 @@ export default function InputBar({
             </div>
 
             <div className="input-bar-container">
+                {isRevisionMode && (
+                    <div className="revision-mode-badge animate-pulse">
+                        <MagicWandIcon /> REVISING: {artifactName || 'CURRENT_GENERATION'}
+                    </div>
+                )}
+
                 {suggestions.length > 0 && !isLoading && (
                     <div className="suggestions-row">
                         <div className="suggestions-label">
@@ -185,9 +202,19 @@ export default function InputBar({
                                 accept="image/*" 
                                 onChange={handleFileSelect}
                             />
+
+                            <button 
+                                className={`expand-button ${isExpanded ? 'active' : ''}`}
+                                onClick={() => setIsExpanded(!isExpanded)}
+                                title={isExpanded ? "Collapse" : "Expand"}
+                            >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    {isExpanded ? <path d="M4 14l8-8 8 8" /> : <path d="M4 10l8 8 8-8" />}
+                                </svg>
+                            </button>
                         </div>
 
-                        <div className="input-field-container">
+                        <div className={`input-field-container ${isExpanded ? 'expanded' : ''}`}>
                             {(!inputValue && !isLoading && attachments.length === 0) && (
                                 <div className="animated-placeholder" key={placeholderIndex}>
                                     <span className="placeholder-text">{placeholders[placeholderIndex]}</span>
@@ -196,15 +223,15 @@ export default function InputBar({
                             )}
                             
                             {!isLoading ? (
-                                <input 
+                                <textarea 
                                     ref={inputRef}
-                                    type="text" 
-                                    className="styled-input"
+                                    className="styled-input styled-textarea"
                                     value={inputValue} 
                                     onChange={(e) => setInputValue(e.target.value)} 
                                     onKeyDown={handleKeyDown} 
                                     disabled={isLoading} 
                                     placeholder=""
+                                    rows={isExpanded ? 6 : 1}
                                 />
                             ) : (
                                 <div className="input-generating-label">

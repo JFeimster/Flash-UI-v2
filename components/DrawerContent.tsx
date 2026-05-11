@@ -33,10 +33,10 @@ interface DrawerContentProps {
     explainCode?: (code: string) => Promise<string | undefined>;
     refactorCode?: (code: string, instruction: string, onChunk?: (chunk: string) => void) => Promise<string | undefined>;
     onRefactorApply?: (newHtml: string) => void;
-    generateRecommendedPages?: (sessionId: string, artifactId: string) => Promise<RecommendedPage[]>;
+    generateRecommendedPages?: (sessionId: string, artifactId: string, outputFormat?: string) => Promise<RecommendedPage[]>;
     onSwitchMode?: (mode: 'code' | 'recommended') => void;
     applyAnimation?: (code: string, animationPrompt: string) => Promise<string | undefined>;
-    generateAdditionalFile?: (baseHtml: string, filename: string, description: string) => Promise<string>;
+    generateAdditionalFile?: (baseHtml: string, filename: string, description: string, outputFormat?: string) => Promise<string>;
     onUpdateArtifactFiles?: (sessionId: string, artifactId: string, files: Record<string, string>) => void;
 }
 
@@ -399,7 +399,7 @@ export default function DrawerContent({
     const loadRecommendedPages = async () => {
         if (!generateRecommendedPages || !data?.sessionId) return;
         setIsRecommendedLoading(true);
-        const pages = await generateRecommendedPages(data.sessionId, data.artifactId);
+        const pages = await generateRecommendedPages(data.sessionId, data.artifactId, downloadFormat);
         setRecommendedPages(pages);
         setIsRecommendedLoading(false);
     };
@@ -436,7 +436,7 @@ export default function DrawerContent({
         });
 
         try {
-            const fileContent = await generateAdditionalFile(data.html, filename, description);
+            const fileContent = await generateAdditionalFile(data.html, filename, description, downloadFormat);
             if (fileContent) {
                 onUpdateArtifactFiles(data.sessionId, data.artifactId, { [filename]: fileContent });
             }

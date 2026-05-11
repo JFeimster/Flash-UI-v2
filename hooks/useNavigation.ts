@@ -13,7 +13,9 @@ export function useNavigation(sessions: Session[]) {
 
     // Sync session index when new sessions are added
     useEffect(() => {
-        if (sessions.length > 0 && currentSessionIndex === -1) {
+        if (sessions.length === 0) {
+            setCurrentSessionIndex(-1);
+        } else if (currentSessionIndex === -1) {
             setCurrentSessionIndex(0);
         } else if (sessions.length > currentSessionIndex + 1) {
             setCurrentSessionIndex(sessions.length - 1);

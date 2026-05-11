@@ -321,7 +321,7 @@ Return ONLY raw HTML/CSS. No Markdown, no explanations.`;
         ));
     };
 
-    const generateAdditionalFile = useCallback(async (baseHtml: string, filename: string, description: string) => {
+    const generateAdditionalFile = useCallback(async (baseHtml: string, filename: string, description: string, outputFormat?: string) => {
         try {
             const ai = getAiClient();
 
@@ -332,6 +332,8 @@ BASE COMPONENT CODE:
 ${baseHtml}
 \`\`\`
 
+THE TARGET OUTPUT FORMAT IS: ${outputFormat || 'Standard HTML'}
+
 YOUR TASK:
 Generate the code for a new file named "${filename}".
 PURPOSE: ${description}
@@ -341,6 +343,7 @@ STRICT REQUIREMENTS:
 - If it's an HTML file, provide a full valid HTML document.
 - If it's a CSS or JS file, provide only that content.
 - Ensure it visually matches the BASE COMPONENT.
+- OPTIMIZE the code for the ${outputFormat || 'selected'} format.
 - No Markdown, no explanations.
             `.trim();
 
@@ -404,6 +407,7 @@ STRICT REQUIREMENTS:
 
     const resetSessions = useCallback(() => {
         setSessions([]);
+        setIsLoading(false);
         try {
             localStorage.removeItem(STORAGE_KEY);
         } catch (e) {
@@ -454,7 +458,7 @@ STRICT REQUIREMENTS:
         }
     }, []);
 
-    const generateRecommendedPages = useCallback(async (sessionId: string, artifactId: string) => {
+    const generateRecommendedPages = useCallback(async (sessionId: string, artifactId: string, outputFormat?: string) => {
         const session = sessions.find(s => s.id === sessionId);
         if (!session) return [];
         
@@ -463,11 +467,13 @@ STRICT REQUIREMENTS:
 
             const prompt = `
 Analyze this UI component prompt: "${session.prompt}".
+The user has selected an output format of: ${outputFormat || 'Standard HTML'}.
+
 Suggest 5 complementary pages to build out a full application based on this component.
 For each page, provide:
 1. A title.
 2. A detailed description of its purpose.
-3. A suggested file structure (list of files).
+3. A suggested file structure (list of files) - OPTIMIZE these for the ${outputFormat || 'selected'} format.
 
 Return ONLY a JSON array of objects with the following structure:
 [
@@ -548,6 +554,66 @@ Return ONLY a JSON array of objects with the following structure:
         }
     }, []);
 
+    const reviseArtifact = useCallback(async (sessionId: string, artifactId: string, instruction: string) => {
+        const session = sessions.find(s => s.id === sessionId);
+        const artifact = session?.artifacts.find(a => a.id === artifactId);
+        if (!session || !artifact) return;
+
+        setIsLoading(true);
+
+        // Update status to streaming/processing
+        setSessions(prev => prev.map(s => s.id === sessionId ? {
+            ...s,
+            artifacts: s.artifacts.map(a => a.id === artifactId ? { ...a, status: 'streaming' } : a)
+        } : s));
+
+        try {
+            const ai = getAiClient();
+            const prompt = `
+You are revising an existing UI component.
+BASE CODE:
+\`\`\`html
+${artifact.html}
+\`\`\`
+
+USER INSTRUCTION: "${instruction}"
+
+YOUR TASK:
+Refactor the BASE CODE strictly based on the instruction.
+Ensure the design remains consistent.
+Return ONLY raw updated HTML/CSS. No Markdown, no explanations.
+            `.trim();
+
+            const responseStream = await withRetry(() => ai.models.generateContentStream({
+                model: 'gemini-3-flash-preview',
+                contents: [{ parts: [{ text: prompt }], role: 'user' }],
+            })) as any;
+
+            let accumulatedHtml = '';
+            for await (const chunk of responseStream) {
+                accumulatedHtml += chunk.text || '';
+                setSessions(prev => prev.map(sess => sess.id === sessionId ? {
+                    ...sess,
+                    artifacts: sess.artifacts.map(art => art.id === artifactId ? { ...art, html: accumulatedHtml } : art)
+                } : sess));
+            }
+
+            setSessions(prev => prev.map(sess => sess.id === sessionId ? {
+                ...sess,
+                artifacts: sess.artifacts.map(art => art.id === artifactId ? { ...art, status: 'complete' } : art)
+            } : sess));
+
+        } catch (e) {
+            console.error("Revision failed:", e);
+            setSessions(prev => prev.map(sess => sess.id === sessionId ? {
+                ...sess,
+                artifacts: sess.artifacts.map(art => art.id === artifactId ? { ...art, status: 'error' } : art)
+            } : sess));
+        } finally {
+            setIsLoading(false);
+        }
+    }, [getAiClient, sessions]);
+
     return {
         sessions,
         savedArtifacts,
@@ -558,6 +624,7 @@ Return ONLY a JSON array of objects with the following structure:
         isLoading,
         componentVariations,
         sendMessage,
+        reviseArtifact,
         generateVariations,
         updateSessionArtifact,
         updateSessionArtifactFiles,
