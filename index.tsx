@@ -50,6 +50,7 @@ if (typeof window !== 'undefined') {
 
 import { useGenAI } from './hooks/useGenAI';
 import { useNavigation } from './hooks/useNavigation';
+import { useMcp, McpRequest } from './hooks/useMcp';
 import { INITIAL_PLACEHOLDERS } from './constants';
 import { SuggestedComponent, Attachment } from './types';
 
@@ -139,6 +140,12 @@ function App() {
       title: string;
       data: any; 
   }>({ isOpen: false, mode: null, title: '', data: null });
+
+  const [mcpRequest, setMcpRequest] = useState<McpRequest | null>(null);
+
+  const { clearPendingRequest, history: mcpHistory, deleteHistoryItem } = useMcp(useCallback((req: McpRequest) => {
+      setMcpRequest(req);
+  }, []));
 
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -302,11 +309,40 @@ function App() {
 
   const hasStarted = sessions.length > 0 || isLoading;
 
+  const handleAcceptMcp = () => {
+    if (mcpRequest) {
+        setInputValue(mcpRequest.prompt);
+        sendMessage(mcpRequest.prompt);
+        clearPendingRequest(mcpRequest.id);
+        setMcpRequest(null);
+    }
+  };
+
+  const handleDeclineMcp = () => {
+    if (mcpRequest) {
+        clearPendingRequest(mcpRequest.id);
+        setMcpRequest(null);
+    }
+  };
+
   return (
     <>
         <a href="https://x.com/ammaar" target="_blank" rel="noreferrer" className={`creator-credit ${hasStarted ? 'hide-on-mobile' : ''}`}>
             created by @ammaar
         </a>
+
+        {mcpRequest && (
+            <div className="mcp-notification animate-in slide-in-from-top-4">
+                <div className="mcp-notification-content">
+                    <div className="mcp-badge">CHATGPT REQUEST</div>
+                    <p className="mcp-prompt">"{mcpRequest.prompt}"</p>
+                    <div className="mcp-actions">
+                        <button className="mcp-btn-accept" onClick={handleAcceptMcp}>Generate UI</button>
+                        <button className="mcp-btn-decline" onClick={handleDeclineMcp}>Ignore</button>
+                    </div>
+                </div>
+            </div>
+        )}
 
         <div className="nav-menu">
             <button 
@@ -358,6 +394,8 @@ function App() {
                 componentVariations={componentVariations}
                 savedArtifacts={savedArtifacts}
                 sessions={sessions}
+                mcpHistory={mcpHistory}
+                onDeleteMcpItem={deleteHistoryItem}
                 userApiKey={userApiKey}
                 setUserApiKey={setUserApiKey}
                 validateApiKey={validateApiKey}

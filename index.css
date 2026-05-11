@@ -57,6 +57,140 @@
     to { opacity: 1; transform: translateY(0); }
 }
 
+/* === MCP UI === */
+.mcp-notification {
+    position: fixed;
+    top: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    width: 100%;
+    max-width: 400px;
+    padding: 0 1rem;
+}
+
+.mcp-notification-content {
+    background: rgba(13, 13, 18, 0.95);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(236, 72, 153, 0.3);
+    border-radius: 1rem;
+    padding: 1.25rem;
+    box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.5), 0 0 20px rgba(236, 72, 153, 0.1);
+}
+
+.mcp-badge {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: #ec4899;
+    letter-spacing: 0.1em;
+    margin-bottom: 0.5rem;
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    background: rgba(236, 72, 153, 0.1);
+    border-radius: 4px;
+}
+
+.mcp-prompt {
+    font-size: 0.9rem;
+    color: #fff;
+    margin-bottom: 1rem;
+    font-weight: 500;
+}
+
+.mcp-actions {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.mcp-btn-accept {
+    flex: 1;
+    background: #ec4899;
+    color: #fff;
+    border: none;
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.mcp-btn-accept:hover {
+    background: #db2777;
+    transform: translateY(-1px);
+}
+
+.mcp-btn-decline {
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0.5rem;
+    padding: 0.5rem 1rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.mcp-btn-decline:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
+/* === Library Section Styling === */
+.library-sections {
+    display: flex;
+    flex-direction: column;
+    gap: 2.5rem;
+}
+
+.library-section-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.library-section-header svg {
+    width: 20px;
+    height: 20px;
+    color: #ec4899;
+}
+
+.style-badge.mcp {
+    background: rgba(236, 72, 153, 0.1);
+    color: #ec4899;
+    font-size: 0.65rem;
+    letter-spacing: 0.05em;
+    font-weight: 700;
+}
+
+.mcp-prompt-preview {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.5);
+    margin-top: 0.5rem;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    font-style: italic;
+}
+
+.library-item.mcp-item {
+    border: 1px solid rgba(236, 72, 153, 0.1);
+}
+
+.library-item.mcp-item:hover {
+    border-color: rgba(236, 72, 153, 0.4);
+}
+
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
