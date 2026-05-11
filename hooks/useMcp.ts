@@ -15,8 +15,13 @@ export function useMcp(onIncomingRequest?: (request: McpRequest) => void) {
         try {
             const response = await fetch('/api/mcp/history');
             if (response.ok) {
-                const data = await response.json();
-                setHistory(data);
+                const text = await response.text();
+                try {
+                    const data = JSON.parse(text);
+                    setHistory(data);
+                } catch (e) {
+                    console.error("MCP History Fetch Error: Invalid JSON:", text.substring(0, 100));
+                }
             }
         } catch (error) {
             console.error("MCP History Fetch Error:", error);
@@ -28,7 +33,14 @@ export function useMcp(onIncomingRequest?: (request: McpRequest) => void) {
             try {
                 const response = await fetch('/api/mcp/pending');
                 if (!response.ok) return;
-                const data: McpRequest[] = await response.json();
+                const text = await response.text();
+                let data: McpRequest[] = [];
+                try {
+                    data = JSON.parse(text);
+                } catch (e) {
+                    console.error("MCP Pending Fetch Error: Invalid JSON:", text.substring(0, 100));
+                    return;
+                }
                 
                 if (data.length > 0 && onIncomingRequest) {
                     onIncomingRequest(data[0]);

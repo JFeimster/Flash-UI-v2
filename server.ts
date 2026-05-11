@@ -7,6 +7,7 @@ import cookieParser from "cookie-parser";
 import { GoogleGenAI } from "@google/genai";
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import path from 'path';
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
@@ -21,6 +22,7 @@ async function startServer() {
   app.use(cors()); // Enable CORS for all routes (important for external MCP clients)
   app.use(cookieParser());
   app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
 
   // === OAuth 2.0 In-Memory Store ===
   const oauthCodes = new Map<string, { userId: string, redirectUri: string }>();
@@ -43,6 +45,10 @@ async function startServer() {
     const { client_id, redirect_uri, state } = req.query;
     if (client_id !== CLIENT_ID) return res.status(400).send("Invalid client_id");
     
+    // Safely encode for HTML
+    const safeRedirectUri = String(redirect_uri || '').replace(/"/g, '&quot;');
+    const safeState = String(state || '').replace(/"/g, '&quot;');
+
     res.send(`
       <div style="font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #0d0d12; color: white;">
         <div style="background: #1a1a24; padding: 2.5rem; border-radius: 1.5rem; border: 1px solid rgba(236,72,153,0.3); text-align: center; max-width: 400px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);">
@@ -52,8 +58,8 @@ async function startServer() {
           <h2 style="font-size: 1.5rem; margin-bottom: 0.5rem;">Secure Access</h2>
           <p style="color: rgba(255,255,255,0.6); margin-bottom: 2rem; font-size: 0.9rem;">Authorize ChatGPT to generate and save UI code to your Flash UI library.</p>
           <form method="POST" action="/oauth/approve">
-            <input type="hidden" name="redirect_uri" value="${redirect_uri}">
-            <input type="hidden" name="state" value="${state}">
+            <input type="hidden" name="redirect_uri" value="${safeRedirectUri}">
+            <input type="hidden" name="state" value="${safeState}">
             <button type="submit" style="background: #ec4899; color: white; border: none; padding: 1rem; border-radius: 0.75rem; font-weight: 600; cursor: pointer; width: 100%; font-size: 1rem; transition: transform 0.1s;">
               Approve Connection
             </button>
@@ -63,18 +69,39 @@ async function startServer() {
     `);
   });
 
-  app.post("/oauth/approve", express.urlencoded({ extended: true }), (req, res) => {
-    addLog(`OAuth: Approve hit - redirect_uri: ${req.body.redirect_uri}`);
+  app.post("/oauth/approve", (req, res) => {
+    addLog(`OAuth: Approve hit - redirect_uri: ${req.body.redirect_uri}, state: ${req.body.state}`);
     const { redirect_uri, state } = req.body;
+    
+    if (!redirect_uri) {
+      addLog(`OAuth: Missing redirect_uri in approve payload`);
+      return res.status(400).send("Missing redirect_uri");
+    }
+
     const code = crypto.randomBytes(16).toString('hex');
     oauthCodes.set(code, { userId: "owner", redirectUri: redirect_uri as string });
-    const callbackUrl = new URL(redirect_uri as string);
-    callbackUrl.searchParams.append('code', code);
-    if (state) callbackUrl.searchParams.append('state', state as string);
-    res.redirect(callbackUrl.toString());
+    
+    try {
+      const callbackUrl = new URL(redirect_uri as string);
+      callbackUrl.searchParams.append('code', code);
+      if (state && state !== "undefined" && state !== "null") {
+        callbackUrl.searchParams.append('state', state as string);
+      }
+      
+      addLog(`OAuth: Redirecting code to: ${callbackUrl.toString()}`);
+      res.redirect(callbackUrl.toString());
+    } catch (e: any) {
+      addLog(`OAuth: Failed to parse redirect_uri: ${e.message}`);
+      res.status(400).send("Invalid redirect_uri format");
+    }
   });
 
-  app.post("/oauth/token", express.urlencoded({ extended: true }), (req, res) => {
+  app.all("/oauth/token", (req, res, next) => {
+    addLog(`OAuth: /oauth/token hit! Method: ${req.method}, Content-Type: ${req.header('content-type')}`);
+    next();
+  });
+
+  app.post("/oauth/token", (req, res) => {
     addLog(`OAuth: Token request received - grant_type: ${req.body.grant_type}`);
     console.log("MCP: Token request received", { 
       grant_type: req.body.grant_type,
@@ -581,7 +608,11 @@ app.post("/api/mcp/delete-history", (req, res) => {
     app.use(vite.middlewares);
   } else {
     // Serve static files in production
-    app.use(express.static('dist'));
+    const distPath = path.join(process.cwd(), 'dist');
+    app.use(express.static(distPath));
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
   }
 
   app.listen(PORT, "0.0.0.0", () => {
