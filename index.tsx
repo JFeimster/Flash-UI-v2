@@ -50,9 +50,8 @@ if (typeof window !== 'undefined') {
 
 import { useGenAI } from './hooks/useGenAI';
 import { useNavigation } from './hooks/useNavigation';
-import { useMcp, McpRequest } from './hooks/useMcp';
 import { INITIAL_PLACEHOLDERS } from './constants';
-import { SuggestedComponent, Attachment } from './types';
+import { SuggestedComponent, Attachment, Artifact } from './types';
 
 import DottedGlowBackground from './components/DottedGlowBackground';
 import SideDrawer from './components/SideDrawer';
@@ -105,6 +104,7 @@ function App() {
     reviseArtifact,
     generateVariations, 
     updateSessionArtifact,
+    addVariationToSession,
     updateSessionArtifactFiles,
     setComponentVariations,
     resetSessions,
@@ -133,6 +133,17 @@ function App() {
   const [inputValue, setInputValue] = useState<string>('');
   const [suggestions, setSuggestions] = useState<SuggestedComponent[]>([]);
   const [showFeatures, setShowFeatures] = useState(false);
+  const [isPromptCollapsed, setIsPromptCollapsed] = useState(false);
+  const [isImmersiveModalOpen, setIsImmersiveModalOpen] = useState(false);
+  const [popoutWidth, setPopoutWidth] = useState<'100%' | '768px' | '375px'>('100%');
+
+  const prevSessionsLength = useRef(sessions.length);
+  useEffect(() => {
+      if (sessions.length > prevSessionsLength.current && sessions.length > 0) {
+          setIsPromptCollapsed(true);
+      }
+      prevSessionsLength.current = sessions.length;
+  }, [sessions.length]);
   
   const [drawerState, setDrawerState] = useState<{
       isOpen: boolean;
@@ -140,12 +151,6 @@ function App() {
       title: string;
       data: any; 
   }>({ isOpen: false, mode: null, title: '', data: null });
-
-  const [mcpRequest, setMcpRequest] = useState<McpRequest | null>(null);
-
-  const { clearPendingRequest, history: mcpHistory, deleteHistoryItem } = useMcp(useCallback((req: McpRequest) => {
-      setMcpRequest(req);
-  }, []));
 
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -211,11 +216,20 @@ function App() {
     }
   }, [currentSession, focusedArtifactIndex, generateVariations, setComponentVariations]);
 
-  const handleApplyVariation = useCallback((html: string) => {
-      if (focusedArtifactIndex === null) return;
-      updateSessionArtifact(currentSessionIndex, focusedArtifactIndex, html);
-      setDrawerState(s => ({ ...s, isOpen: false }));
-  }, [currentSessionIndex, focusedArtifactIndex, updateSessionArtifact]);
+  const handleApplyVariation = useCallback((code: string) => {
+      if (currentSession && focusedArtifactIndex !== null) {
+          const originalArtifact = currentSession.artifacts[focusedArtifactIndex];
+          const newArtifact: Artifact = {
+              id: Math.random().toString(36).substring(7),
+              html: code,
+              styleName: `${originalArtifact.styleName} (Variant)`,
+              status: 'complete'
+          };
+          addVariationToSession(currentSessionIndex, newArtifact);
+          setFocusedArtifactIndex(currentSession.artifacts.length);
+          setDrawerState(s => ({ ...s, isOpen: false }));
+      }
+  }, [currentSession, currentSessionIndex, focusedArtifactIndex, addVariationToSession]);
 
   const handleShowCode = useCallback(() => {
       if (currentSession && focusedArtifactIndex !== null) {
@@ -309,40 +323,17 @@ function App() {
 
   const hasStarted = sessions.length > 0 || isLoading;
 
-  const handleAcceptMcp = () => {
-    if (mcpRequest) {
-        setInputValue(mcpRequest.prompt);
-        sendMessage(mcpRequest.prompt);
-        clearPendingRequest(mcpRequest.id);
-        setMcpRequest(null);
-    }
-  };
-
-  const handleDeclineMcp = () => {
-    if (mcpRequest) {
-        clearPendingRequest(mcpRequest.id);
-        setMcpRequest(null);
-    }
-  };
+  useEffect(() => {
+      if (!hasStarted) {
+          setIsPromptCollapsed(false);
+      }
+  }, [hasStarted]);
 
   return (
     <>
         <a href="https://x.com/ammaar" target="_blank" rel="noreferrer" className={`creator-credit ${hasStarted ? 'hide-on-mobile' : ''}`}>
             created by @ammaar
         </a>
-
-        {mcpRequest && (
-            <div className="mcp-notification animate-in slide-in-from-top-4">
-                <div className="mcp-notification-content">
-                    <div className="mcp-badge">CHATGPT REQUEST</div>
-                    <p className="mcp-prompt">"{mcpRequest.prompt}"</p>
-                    <div className="mcp-actions">
-                        <button className="mcp-btn-accept" onClick={handleAcceptMcp}>Generate UI</button>
-                        <button className="mcp-btn-decline" onClick={handleDeclineMcp}>Ignore</button>
-                    </div>
-                </div>
-            </div>
-        )}
 
         <div className="nav-menu">
             <button 
@@ -394,8 +385,6 @@ function App() {
                 componentVariations={componentVariations}
                 savedArtifacts={savedArtifacts}
                 sessions={sessions}
-                mcpHistory={mcpHistory}
-                onDeleteMcpItem={deleteHistoryItem}
                 userApiKey={userApiKey}
                 setUserApiKey={setUserApiKey}
                 validateApiKey={validateApiKey}
@@ -461,6 +450,17 @@ function App() {
                     <button onClick={() => setFocusedArtifactIndex(null)}>
                         <GridIcon /> Grid View
                     </button>
+                    {currentSession && focusedArtifactIndex !== null && (
+                        <button onClick={() => setIsImmersiveModalOpen(true)} className="popout-trigger-btn font-bold">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
+                                <path d="M15 3h6v6" />
+                                <path d="M9 21H3v-6" />
+                                <path d="M21 3l-7 7" />
+                                <path d="M3 21l7-7" />
+                            </svg> 
+                            Full Popout
+                        </button>
+                    )}
 
                     {currentSession && focusedArtifactIndex !== null && (
                         <>
@@ -503,6 +503,16 @@ function App() {
                  </div>
             </div>
 
+            {isPromptCollapsed && hasStarted && (
+                <button 
+                    className="floating-prompt-trigger" 
+                    onClick={() => setIsPromptCollapsed(false)}
+                    title="Show Prompt Panel"
+                >
+                    <MagicWandIcon /> <span>✎ Edit / Revise Prompt</span>
+                </button>
+            )}
+
             <InputBar 
                 inputValue={inputValue}
                 setInputValue={setInputValue}
@@ -515,7 +525,62 @@ function App() {
                 onSuggestionClick={handleSuggestionClick}
                 isRevisionMode={currentSession !== null && focusedArtifactIndex !== null}
                 artifactName={currentSession && focusedArtifactIndex !== null ? currentSession.artifacts[focusedArtifactIndex].styleName : undefined}
+                hasStarted={hasStarted}
+                isCollapsed={isPromptCollapsed}
+                onCollapse={() => setIsPromptCollapsed(true)}
             />
+
+            {/* Immersive Fullscreen Popout Modal */}
+            {isImmersiveModalOpen && currentSession && focusedArtifactIndex !== null && (
+                <div className="fullscreen-popout-overlay" onClick={() => setIsImmersiveModalOpen(false)}>
+                    <div className="fullscreen-popout-content" onClick={(e) => e.stopPropagation()}>
+                        <div className="fullscreen-popout-header">
+                            <div className="flex items-center gap-4">
+                                <span className="popout-title">{currentSession.artifacts[focusedArtifactIndex].styleName}</span>
+                                <span className="popout-subtitle font-mono">Full-Scale Popout View</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <button 
+                                    className={`responsive-btn-pill ${popoutWidth === '375px' ? 'active' : ''}`}
+                                    onClick={() => setPopoutWidth('375px')}
+                                    title="Mobile Preview"
+                                >
+                                    Mobile
+                                </button>
+                                <button 
+                                    className={`responsive-btn-pill ${popoutWidth === '768px' ? 'active' : ''}`}
+                                    onClick={() => setPopoutWidth('768px')}
+                                    title="Tablet Preview"
+                                >
+                                    Tablet
+                                </button>
+                                <button 
+                                    className={`responsive-btn-pill ${popoutWidth === '100%' ? 'active' : ''}`}
+                                    onClick={() => setPopoutWidth('100%')}
+                                    title="Desktop Preview"
+                                >
+                                    Desktop
+                                </button>
+
+                                <button 
+                                    className="close-fullscreen-btn font-bold"
+                                    onClick={() => setIsImmersiveModalOpen(false)}
+                                >
+                                    Exit Popout
+                                </button>
+                            </div>
+                        </div>
+                        <div className="fullscreen-iframe-container" style={{ width: popoutWidth }}>
+                            <iframe 
+                                srcDoc={currentSession.artifacts[focusedArtifactIndex].html} 
+                                title="fullscreen-preview"
+                                sandbox="allow-scripts allow-forms allow-modals allow-popups allow-presentation allow-same-origin"
+                                className="fullscreen-iframe"
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     </>
   );

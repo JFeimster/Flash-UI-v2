@@ -22,8 +22,6 @@ interface DrawerContentProps {
     componentVariations: ComponentVariation[];
     savedArtifacts: Artifact[];
     sessions?: Session[];
-    mcpHistory?: any[];
-    onDeleteMcpItem?: (id: string) => void;
     userApiKey?: string;
     setUserApiKey?: (key: string) => void;
     validateApiKey?: (key: string) => Promise<boolean>;
@@ -111,8 +109,6 @@ export default function DrawerContent({
     componentVariations,
     savedArtifacts,
     sessions = [],
-    mcpHistory = [],
-    onDeleteMcpItem,
     userApiKey,
     setUserApiKey,
     validateApiKey,
@@ -1079,7 +1075,7 @@ export default function DrawerContent({
 
             {mode === 'library' && (
                 <div className="library-wrapper">
-                    {(allSavedAndFavorites.length === 0 && mcpHistory.length === 0) ? (
+                    {allSavedAndFavorites.length === 0 ? (
                         <div className="no-results" style={{padding: '60px 20px'}}>
                             <div className="empty-library-icons">
                                 <BookmarkIcon />
@@ -1141,49 +1137,6 @@ export default function DrawerContent({
                                                             {artifact.isSaved && <BookmarkFilledIcon style={{color: '#6b21ff', width: '14px', height: '14px'}} />}
                                                         </div>
                                                     </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            {mcpHistory.length > 0 && (
-                                <div className="library-section">
-                                    <div className="library-section-header">
-                                        <BotIcon /> ChatGPT History
-                                    </div>
-                                    <div className="library-grid">
-                                        {mcpHistory.map((item) => (
-                                            <div key={item.id} className="library-item mcp-item">
-                                                <div className="library-item-preview">
-                                                    <iframe 
-                                                        srcDoc={item.code} 
-                                                        title={item.prompt} 
-                                                        sandbox="allow-scripts allow-same-origin"
-                                                    />
-                                                    <div className="library-item-overlay">
-                                                        <button 
-                                                            className="library-action-btn"
-                                                            onClick={() => onDeleteMcpItem?.(item.id)}
-                                                            title="Remove"
-                                                        >
-                                                            <XIcon />
-                                                        </button>
-                                                        <button 
-                                                            className="library-action-btn primary"
-                                                            onClick={() => onApplyVariation(item.code)}
-                                                            title="Restore"
-                                                        >
-                                                            Restore
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                                <div className="library-item-info">
-                                                    <div className="info-main">
-                                                        <span className="style-badge mcp">ChatGPT Generation</span>
-                                                    </div>
-                                                    <div className="mcp-prompt-preview">{item.prompt}</div>
                                                 </div>
                                             </div>
                                         ))}

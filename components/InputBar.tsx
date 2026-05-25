@@ -24,6 +24,9 @@ interface InputBarProps {
     onSuggestionClick: (suggestion: SuggestedComponent) => void;
     isRevisionMode?: boolean;
     artifactName?: string;
+    isCollapsed?: boolean;
+    onCollapse?: () => void;
+    hasStarted?: boolean;
 }
 
 export default function InputBar({ 
@@ -37,7 +40,10 @@ export default function InputBar({
     suggestions,
     onSuggestionClick,
     isRevisionMode,
-    artifactName
+    artifactName,
+    isCollapsed = false,
+    onCollapse,
+    hasStarted = false
 }: InputBarProps) {
     const [placeholderIndex, setPlaceholderIndex] = useState(0);
     const [placeholders, setPlaceholders] = useState<string[]>(INITIAL_PLACEHOLDERS);
@@ -63,7 +69,7 @@ export default function InputBar({
                 if (!apiKey) return;
                 const ai = new GoogleGenAI({ apiKey });
                 const response = await ai.models.generateContent({
-                    model: 'gemini-3-flash-preview',
+                    model: 'gemini-3.5-flash',
                     contents: { 
                         role: 'user', 
                         parts: [{ 
@@ -221,18 +227,7 @@ export default function InputBar({
     };
 
     return (
-        <div className="input-dashboard-wrapper">
-            <div className="control-strip">
-                <div className={`status-indicator ${isLoading ? 'loading' : ''}`}>
-                    <div className="dot" />
-                    <span>{isLoading ? 'System Processing...' : 'System Ready'}</span>
-                </div>
-                <div className="dashboard-labels">
-                    <div className="mini-label">Session: LIVE_NODE_01</div>
-                    <div className="mini-label">Vibe: MAX_CREATIVE</div>
-                </div>
-            </div>
-
+        <div className={`input-dashboard-wrapper ${isCollapsed ? 'collapsed' : ''}`}>
             <div className="input-bar-container" onDragOver={handleDragOver} onDrop={handleDrop}>
                 {isRevisionMode && (
                     <div className="revision-mode-badge animate-pulse">
@@ -329,12 +324,24 @@ export default function InputBar({
                             <button 
                                 className={`expand-button ${isExpanded ? 'active' : ''}`}
                                 onClick={() => setIsExpanded(!isExpanded)}
-                                title={isExpanded ? "Collapse" : "Expand"}
+                                title={isExpanded ? "Collapse Text Input" : "Expand Text Input"}
                             >
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     {isExpanded ? <path d="M4 14l8-8 8 8" /> : <path d="M4 10l8 8 8-8" />}
                                 </svg>
                             </button>
+
+                            {hasStarted && onCollapse && (
+                                <button 
+                                    className="collapse-panel-btn"
+                                    onClick={onCollapse}
+                                    title="Hide Prompt Panel"
+                                >
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M12 5v14M19 12l-7 7-7-7" />
+                                    </svg>
+                                </button>
+                            )}
 
                             <button 
                                 className={`attachment-button ${showUrlInput ? 'active' : ''}`}
@@ -381,11 +388,15 @@ export default function InputBar({
                                         ref={inputRef}
                                         className="styled-input styled-textarea"
                                         value={inputValue} 
-                                        onChange={(e) => setInputValue(e.target.value)} 
+                                        onChange={(e) => {
+                                            setInputValue(e.target.value);
+                                            e.target.style.height = 'auto';
+                                            e.target.style.height = e.target.scrollHeight + 'px';
+                                        }} 
                                         onKeyDown={handleKeyDown} 
                                         disabled={isLoading} 
                                         placeholder=""
-                                        rows={isExpanded ? 6 : 1}
+                                        rows={isExpanded ? 10 : 3}
                                     />
                                 ) : (
                                     <div className="input-generating-label">

@@ -82,7 +82,7 @@ export const useGenAI = () => {
             
             // Simple validation call using the SDK's existing pattern
             const result = await ai.models.generateContent({
-                model: 'gemini-1.5-flash',
+                model: 'gemini-3.5-flash',
                 contents: [{ parts: [{ text: 'ping' }], role: 'user' }]
             }) as GenerateContentResponse;
 
@@ -175,7 +175,7 @@ Required JSON Output Format (stream ONE object per line):
             `.trim();
 
             const responseStream = await withRetry(() => ai.models.generateContentStream({
-                model: 'gemini-3-flash-preview',
+                model: 'gemini-3.5-flash',
                 contents: [{ parts: [{ text: prompt }], role: 'user' }],
                 config: { temperature: 1.2 }
             })) as any;
@@ -243,7 +243,7 @@ Required JSON Output Format (stream ONE object per line):
 
             // Wrap style generation with retry logic
             const styleResponse = await withRetry(() => ai.models.generateContent({
-                model: 'gemini-3-flash-preview',
+                model: 'gemini-3.5-flash',
                 contents: { role: 'user', parts: [{ text: stylePrompt }] }
             })) as GenerateContentResponse;
 
@@ -296,7 +296,7 @@ STRICT REQUIREMENTS:
 
                     // Wrap stream connection with retry logic
                     const responseStream = await withRetry(() => ai.models.generateContentStream({
-                        model: 'gemini-3-flash-preview',
+                        model: 'gemini-3.5-flash',
                         contents: [{ parts, role: 'user' }],
                     })) as any;
 
@@ -342,6 +342,15 @@ STRICT REQUIREMENTS:
         ));
     };
 
+    const addVariationToSession = (sessionIndex: number, newArtifact: Artifact) => {
+        setSessions(prev => prev.map((sess, i) => 
+            i === sessionIndex ? {
+                ...sess,
+                artifacts: [...sess.artifacts, newArtifact]
+            } : sess
+        ));
+    };
+
     const updateSessionArtifactFiles = (sessionId: string, artifactId: string, files: Record<string, string>) => {
         setSessions(prev => prev.map(sess => 
             sess.id === sessionId ? {
@@ -383,7 +392,7 @@ STRICT REQUIREMENTS:
             `.trim();
 
             const result = await withRetry(() => ai.models.generateContent({
-                model: 'gemini-3-flash-preview',
+                model: 'gemini-3.5-flash',
                 contents: [{ parts: [{ text: prompt }], role: 'user' }],
             })) as GenerateContentResponse;
 
@@ -457,7 +466,7 @@ STRICT REQUIREMENTS:
             const prompt = `Explain the following code snippet in a concise and clear way. Focus on the main functionality and key design choices:\n\n\`\`\`html\n${code}\n\`\`\``;
             
             const result = await withRetry(() => ai.models.generateContent({
-                model: 'gemini-3-flash-preview',
+                model: 'gemini-3.5-flash',
                 contents: [{ parts: [{ text: prompt }], role: 'user' }],
             })) as GenerateContentResponse;
 
@@ -475,7 +484,7 @@ STRICT REQUIREMENTS:
             const prompt = `Refactor the following code snippet based on this instruction: "${instruction}". Return ONLY the refactored raw HTML/CSS. No Markdown.\n\n\`\`\`html\n${code}\n\`\`\``;
             
             const responseStream = await withRetry(() => ai.models.generateContentStream({
-                model: 'gemini-3-flash-preview',
+                model: 'gemini-3.5-flash',
                 contents: [{ parts: [{ text: prompt }], role: 'user' }],
             })) as any;
 
@@ -521,7 +530,7 @@ Return ONLY a JSON array of objects with the following structure:
             `.trim();
 
             const response = await withRetry(() => ai.models.generateContent({
-                model: 'gemini-3-flash-preview',
+                model: 'gemini-3.5-flash',
                 contents: [{ parts: [{ text: prompt }], role: 'user' }],
                 config: { responseMimeType: 'application/json' }
             })) as GenerateContentResponse;
@@ -543,7 +552,7 @@ Ensure the animations are "sizzling", modern, and highly engaging.
 Return ONLY the complete updated raw HTML/CSS. No Markdown, no explanations.\n\n\`\`\`html\n${code}\n\`\`\``;
             
             const result = await withRetry(() => ai.models.generateContent({
-                model: 'gemini-3-flash-preview',
+                model: 'gemini-3.5-flash',
                 contents: [{ parts: [{ text: prompt }], role: 'user' }],
             })) as GenerateContentResponse;
 
@@ -576,7 +585,7 @@ Return ONLY a JSON array of objects with the following structure:
             `.trim();
             
             const result = await withRetry(() => ai.models.generateContent({
-                model: 'gemini-3-flash-preview',
+                model: 'gemini-3.5-flash',
                 contents: [{ parts: [{ text: prompt }], role: 'user' }],
                 config: { responseMimeType: 'application/json' }
             })) as GenerateContentResponse;
@@ -655,7 +664,7 @@ STRICT REQUIREMENTS:
             });
 
             const responseStream = await withRetry(() => ai.models.generateContentStream({
-                model: 'gemini-3-flash-preview',
+                model: 'gemini-3.5-flash',
                 contents: [{ parts, role: 'user' }],
             })) as any;
 
@@ -697,6 +706,7 @@ STRICT REQUIREMENTS:
         reviseArtifact,
         generateVariations,
         updateSessionArtifact,
+        addVariationToSession,
         updateSessionArtifactFiles,
         setComponentVariations,
         resetSessions,

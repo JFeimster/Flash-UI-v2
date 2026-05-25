@@ -1,4 +1,7 @@
 {
   "name": "Flash UI",
-  "description": "Put Gemini 3 Flash's creativity and coding abilities to the test. Rapidly generate UI from prompts, images, source files, and folders. Explore variations and export production-ready code."
+  "description": "Put Gemini 3 Flash's creativity and coding abilities to the test. Rapidly generate UI from prompts, images, source files, and folders. Explore variations and export production-ready code.",
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
