@@ -39,6 +39,7 @@ interface DrawerContentProps {
     applyAnimation?: (code: string, animationPrompt: string) => Promise<string | undefined>;
     generateAdditionalFile?: (baseHtml: string, filename: string, description: string, outputFormat?: string) => Promise<string>;
     onUpdateArtifactFiles?: (sessionId: string, artifactId: string, files: Record<string, string>) => void;
+    generateTailoredRecommendations?: (currentPrompt: string, html: string) => Promise<{ components: string[], integrations: string[], apis: string[] }>;
 }
 
 const FORMATS = [
@@ -125,7 +126,8 @@ export default function DrawerContent({
     onSwitchMode,
     applyAnimation,
     generateAdditionalFile,
-    onUpdateArtifactFiles
+    onUpdateArtifactFiles,
+    generateTailoredRecommendations
 }: DrawerContentProps) {
     const [downloadFormat, setDownloadFormat] = useState<'static' | 'nextjs' | 'wix' | 'notion' | 'react' | 'vue' | 'svelte'>('static');
     const [recommendedFormat, setRecommendedFormat] = useState<string>('');
@@ -150,6 +152,28 @@ export default function DrawerContent({
 
     // Animations state
     const [isAnimating, setIsAnimating] = useState(false);
+
+    // Dynamic Blueprint Subtab State & Lists Tracker
+    const [subTab, setSubTab] = useState<'pages' | 'components' | 'integrations' | 'apis'>('pages');
+
+    // Checked items for Injection
+    const [checkedComponents, setCheckedComponents] = useState<Set<string>>(new Set());
+    const [checkedIntegrations, setCheckedIntegrations] = useState<Set<string>>(new Set());
+    const [checkedAPIs, setCheckedAPIs] = useState<Set<string>>(new Set());
+
+    // Custom items lists (so users can add/create their own items)
+    const [customComponents, setCustomComponents] = useState<string[]>([]);
+    const [customIntegrations, setCustomIntegrations] = useState<string[]>([]);
+    const [customAPIs, setCustomAPIs] = useState<string[]>([]);
+
+    // Simple text box inputs for adding custom items
+    const [customComponentInput, setCustomComponentInput] = useState('');
+    const [customIntegrationInput, setCustomIntegrationInput] = useState('');
+    const [customAPIInput, setCustomAPIInput] = useState('');
+
+    const [isInjecting, setIsInjecting] = useState(false);
+    const [injectionStatus, setInjectionStatus] = useState<string | null>(null);
+    const [isTailoring, setIsTailoring] = useState(false);
 
     // Multi-file state
     const [activeFile, setActiveFile] = useState<string>('');
@@ -423,6 +447,133 @@ export default function DrawerContent({
         const pages = await generateRecommendedPages(data.sessionId, data.artifactId, downloadFormat);
         setRecommendedPages(pages);
         setIsRecommendedLoading(false);
+    };
+
+    const DEFAULT_RECOMMENDED_COMPONENTS = [
+        "Sleek Dark Mode Toggle",
+        "Multi-Column Responsive Grid View",
+        "Interactive Data Table with Search & Filtering",
+        "CSV/JSON Data Uploader & Preview Table",
+        "Interactive Stats Overview Bento Grid",
+        "Clean User Settings Modal with Profile Forms",
+        "Animated Toast Notifications",
+        "Responsive Navigation Sidebar"
+    ];
+
+    const DEFAULT_INTEGRATIONS = [
+        { name: "Firebase Firestore & Auth", desc: "Allows sign-in and saving artifacts to user portfolios with secure rules." },
+        { name: "Google Drive & Google Picker", desc: "Saves generated code files directly in Drive and browses asset references." },
+        { name: "Google Sheets Grounding", desc: "Integrates spreadsheets context dynamically into the UI as a database grid." },
+        { name: "Google Calendar & Tasks", desc: "Saves schedules, events, or todo boards back to the user's active workspace." },
+        { name: "Gmail & Google Meet Sync", desc: "Saves drafts of generated components or triggers automated meetings with deep links." }
+    ];
+
+    const DEFAULT_APIS = [
+        { name: "Stripe Subscriptions", type: "Payment", desc: "Creates checkout modals and billing status pills." },
+        { name: "SendGrid SMTP Mailer", type: "Email Dispatcher", desc: "Sends custom reports or confirmation triggers." },
+        { name: "Twilio Alerts Integration", type: "SMS", desc: "Wires real-time SMS alert switches and mock messaging logs." },
+        { name: "OpenWeather Live Grounder", type: "Weather API", desc: "Injects live geographical weather forecasts." },
+        { name: "GitHub OAuth Publisher", type: "Publisher", desc: "Synchronizes generated templates straight to GitHub commits." }
+    ];
+
+    const handleInjectSelectedBlueprints = async () => {
+        if (!refactorCode || !data?.html) return;
+        setIsInjecting(true);
+        setInjectionStatus("Analyzing code layout & synthesizing selected components...");
+
+        const componentsToIncorporate = [
+            ...Array.from(checkedComponents),
+            ...customComponents
+        ];
+        const integrationsToIncorporate = [
+            ...DEFAULT_INTEGRATIONS.filter(item => checkedIntegrations.has(item.name)).map(item => `${item.name}: ${item.desc}`),
+            ...customIntegrations
+        ];
+        const apisToIncorporate = [
+            ...DEFAULT_APIS.filter(item => checkedAPIs.has(item.name)).map(item => `${item.name} (${item.type}): ${item.desc}`),
+            ...customAPIs
+        ];
+
+        if (componentsToIncorporate.length === 0 && integrationsToIncorporate.length === 0 && apisToIncorporate.length === 0) {
+            alert("Please select at least one component, integration, or API/Webhook from the checklists to inject!");
+            setIsInjecting(false);
+            return;
+        }
+
+        const prompt = `Refactor this UI to fully incorporate the following requested capabilities:
+${componentsToIncorporate.length > 0 ? `COMPONENTS & UX MODES TO INTEGRATE:\n- ${componentsToIncorporate.join('\n- ')}\n` : ''}
+${integrationsToIncorporate.length > 0 ? `AI INTEGRATIONS TO PRE-CONFIGURE:\n- ${integrationsToIncorporate.join('\n- ')}\n` : ''}
+${apisToIncorporate.length > 0 ? `WEBHOOKS / ACTIONS / APIS TO STENCIL OUT:\n- ${apisToIncorporate.join('\n- ')}\n` : ''}
+
+INSTRUCTIONS:
+1. Revamp the UI layout. Add beautiful modern visual controls (like toggles, sidebars, interactive dashboard cards, forms, config panels, stats rows, action logs, connection states) representing each checked feature.
+2. Structure the template code cleanly. Implement complete interactive mock states (using React/vanilla JS or Tailwind states) for these new controls so they look and work correctly inside the live preview.
+3. Write actual client-ready stencils, variables, and API trigger structures (using fetch/axios placeholders), explaining where to put the keys and how the endpoints interact.
+4. Maintain the absolute crisp visual vibe, background colors, and typography. Ensure the resulting UI looks high-fidelity, polished, and premium.`;
+
+        try {
+            setInjectionStatus("Writing code modifications...");
+            const result = await refactorCode(data.html, prompt);
+            if (result && onRefactorApply) {
+                onRefactorApply(result);
+                setInjectionStatus("Successfully integrated requested blueprints!");
+                setTimeout(() => setInjectionStatus(null), 3000);
+            } else {
+                setInjectionStatus("Refinement returned empty. Try again.");
+                setTimeout(() => setInjectionStatus(null), 3000);
+            }
+        } catch (e) {
+            console.error(e);
+            setInjectionStatus("Injection failed. Please check your token or try again.");
+            setTimeout(() => setInjectionStatus(null), 3000);
+        } finally {
+            setIsInjecting(false);
+        }
+    };
+
+    const handleAITailorRecommendations = async () => {
+        if (!data?.html || !generateTailoredRecommendations || !data?.prompt) {
+            alert("Ensure your draft holds prompts before tailoring recommendations.");
+            return;
+        }
+        setIsTailoring(true);
+        setInjectionStatus("AI is analyzing active prototype context...");
+        try {
+            const parsed = await generateTailoredRecommendations(data.prompt, data.html);
+            
+            if (parsed.components && parsed.components.length > 0) {
+                setCustomComponents(prev => [...prev, ...parsed.components]);
+                parsed.components.forEach((c: string) => setCheckedComponents(curr => {
+                    const next = new Set(curr);
+                    next.add(c);
+                    return next;
+                }));
+            }
+            if (parsed.integrations && parsed.integrations.length > 0) {
+                setCustomIntegrations(prev => [...prev, ...parsed.integrations]);
+                parsed.integrations.forEach((i: string) => setCheckedIntegrations(curr => {
+                    const next = new Set(curr);
+                    next.add(i);
+                    return next;
+                }));
+            }
+            if (parsed.apis && parsed.apis.length > 0) {
+                setCustomAPIs(prev => [...prev, ...parsed.apis]);
+                parsed.apis.forEach((a: string) => setCheckedAPIs(curr => {
+                    const next = new Set(curr);
+                    next.add(a);
+                    return next;
+                }));
+            }
+            setInjectionStatus("Custom suggestions tailored & auto-checked!");
+            setTimeout(() => setInjectionStatus(null), 3500);
+        } catch (e) {
+            console.error(e);
+            setInjectionStatus("AI Analysis failed. Try again.");
+            setTimeout(() => setInjectionStatus(null), 3000);
+        } finally {
+            setIsTailoring(false);
+        }
     };
 
     const handleCopyFile = () => {
@@ -804,75 +955,349 @@ export default function DrawerContent({
             {mode === 'recommended' && (
                 <div className="recommended-pages-wrapper">
                     <div className="recommended-actions-bar">
-                        <div className="section-title">Project Blueprint</div>
+                        <div className="section-title">Architect Blueprint</div>
                         <div className="blueprint-actions">
-                            <button 
-                                className="blueprint-btn copy-btn"
-                                onClick={handleCopyRecommended}
-                                title="Copy as Markdown"
-                            >
-                                <CopyIcon /> {exportFeedback || 'Copy Markdown'}
-                            </button>
-                            <div className="export-menu-container">
-                                <button 
-                                    className="blueprint-btn export-btn"
-                                    onClick={() => setShowExportMenu(!showExportMenu)}
-                                >
-                                    <DownloadIcon /> Export <ChevronDownIcon />
-                                </button>
-                                {showExportMenu && (
-                                    <div className="export-dropdown">
-                                        <button onClick={() => handleDownloadFormat('md')}>Markdown (.md)</button>
-                                        <button onClick={() => handleDownloadFormat('txt')}>Text (.txt)</button>
-                                        <button onClick={() => handleDownloadFormat('pdf')}>PDF Document</button>
-                                        <button onClick={() => handleDownloadFormat('doc')}>Word Doc (.docx)</button>
+                            {subTab === 'pages' && (
+                                <>
+                                    <button 
+                                        className="blueprint-btn copy-btn"
+                                        onClick={handleCopyRecommended}
+                                        title="Copy as Markdown"
+                                    >
+                                        <CopyIcon /> {exportFeedback || 'Copy Markdown'}
+                                    </button>
+                                    <div className="export-menu-container">
+                                        <button 
+                                            className="blueprint-btn export-btn"
+                                            onClick={() => setShowExportMenu(!showExportMenu)}
+                                        >
+                                            <DownloadIcon /> Export <ChevronDownIcon />
+                                        </button>
+                                        {showExportMenu && (
+                                            <div className="export-dropdown">
+                                                <button onClick={() => handleDownloadFormat('md')}>Markdown (.md)</button>
+                                                <button onClick={() => handleDownloadFormat('txt')}>Text (.txt)</button>
+                                                <button onClick={() => handleDownloadFormat('pdf')}>PDF Document</button>
+                                                <button onClick={() => handleDownloadFormat('doc')}>Word Doc (.docx)</button>
+                                            </div>
+                                        )}
                                     </div>
-                                )}
-                            </div>
+                                </>
+                            )}
+                            <button 
+                                className="blueprint-btn ai-tailor-btn"
+                                onClick={handleAITailorRecommendations}
+                                disabled={isTailoring || isInjecting}
+                                title="AI Auto-suggest tailored components & APIs"
+                            >
+                                {isTailoring ? <ThinkingIcon /> : '🔮 AI Suggest'}
+                            </button>
                         </div>
                     </div>
 
-                    {isRecommendedLoading ? (
-                        <div className="loading-state">
-                            <ThinkingIcon /> 
-                            Analyzing component & suggesting pages...
+                    <div className="blueprint-tabs">
+                        <button 
+                            className={`blueprint-tab ${subTab === 'pages' ? 'active' : ''}`}
+                            onClick={() => setSubTab('pages')}
+                        >
+                            🗂️ App Pages
+                        </button>
+                        <button 
+                            className={`blueprint-tab ${subTab === 'components' ? 'active' : ''}`}
+                            onClick={() => setSubTab('components')}
+                        >
+                            🧱 UI Components
+                        </button>
+                        <button 
+                            className={`blueprint-tab ${subTab === 'integrations' ? 'active' : ''}`}
+                            onClick={() => setSubTab('integrations')}
+                        >
+                            ⚡ AI Integrations
+                        </button>
+                        <button 
+                            className={`blueprint-tab ${subTab === 'apis' ? 'active' : ''}`}
+                            onClick={() => setSubTab('apis')}
+                        >
+                            🔌 Actions & APIs
+                        </button>
+                    </div>
+
+                    {injectionStatus && (
+                        <div className="injection-status-banner">
+                            <span className="pulse-bullet"></span> {injectionStatus}
                         </div>
-                    ) : (
-                        <div className="recommended-list">
-                            {recommendedPages.map((page, i) => (
-                                <div key={i} className="recommended-card">
-                                    <div className="recommended-header">
-                                        <h3>{page.title}</h3>
-                                    </div>
-                                    <p className="recommended-desc">{page.description}</p>
-                                    <div className="file-structure">
-                                        <div className="structure-label">Suggested Structure:</div>
-                                        <ul className="structure-list">
-                                            {page.fileStructure.map((file, j) => {
-                                                const isGenerated = data?.additionalFiles?.[file];
-                                                const isGenerating = generatingFiles.has(file);
-                                                
-                                                return (
-                                                    <li key={j} className="structure-item">
-                                                        <span className="file-name">{file}</span>
-                                                        {isGenerated ? (
-                                                            <span className="generated-tag">Added</span>
-                                                        ) : (
-                                                            <button 
-                                                                className="generate-file-btn"
-                                                                onClick={() => handleGeneratePageFile(file, `Part of ${page.title}: ${page.description}`)}
-                                                                disabled={isGenerating}
-                                                            >
-                                                                {isGenerating ? 'Generating...' : 'Generate'}
-                                                            </button>
-                                                        )}
-                                                    </li>
-                                                );
-                                            })}
-                                        </ul>
-                                    </div>
+                    )}
+
+                    {subTab === 'pages' && (
+                        <>
+                            {isRecommendedLoading ? (
+                                <div className="loading-state">
+                                    <ThinkingIcon /> 
+                                    Analyzing component & suggesting pages...
                                 </div>
-                            ))}
+                            ) : (
+                                <div className="recommended-list">
+                                    {recommendedPages.map((page, i) => (
+                                        <div key={i} className="recommended-card">
+                                            <div className="recommended-header">
+                                                <h3>{page.title}</h3>
+                                            </div>
+                                            <p className="recommended-desc">{page.description}</p>
+                                            <div className="file-structure">
+                                                <div className="structure-label">Suggested Structure:</div>
+                                                <ul className="structure-list">
+                                                    {page.fileStructure.map((file, j) => {
+                                                        const isGenerated = data?.additionalFiles?.[file];
+                                                        const isGenerating = generatingFiles.has(file);
+                                                        
+                                                        return (
+                                                            <li key={j} className="structure-item">
+                                                                <span className="file-name">{file}</span>
+                                                                {isGenerated ? (
+                                                                    <span className="generated-tag">Added</span>
+                                                                ) : (
+                                                                    <button 
+                                                                        className="generate-file-btn"
+                                                                        onClick={() => handleGeneratePageFile(file, `Part of ${page.title}: ${page.description}`)}
+                                                                        disabled={isGenerating}
+                                                                    >
+                                                                        {isGenerating ? 'Generating...' : 'Generate'}
+                                                                    </button>
+                                                                )}
+                                                            </li>
+                                                        );
+                                                    })}
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {recommendedPages.length === 0 && (
+                                        <div className="recommended-empty-tip">
+                                            No pages suggested yet. Select standard Static, Next.js or React formats to fetch full-stack blueprint page arrays.
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </>
+                    )}
+
+                    {subTab === 'components' && (
+                        <div className="sub-components-panel">
+                            <p className="tab-instructions">Select responsive layout modes, views, or complementary components to insert straight into this prototype.</p>
+                            
+                            <div className="add-custom-row">
+                                <input 
+                                    type="text" 
+                                    placeholder="Add custom component/mode descriptor..." 
+                                    value={customComponentInput}
+                                    onChange={(e) => setCustomComponentInput(e.target.value)}
+                                    className="custom-input-box"
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && customComponentInput.trim()) {
+                                            setCustomComponents(prev => [...prev, customComponentInput.trim()]);
+                                            setCheckedComponents(curr => {
+                                                const next = new Set(curr);
+                                                next.add(customComponentInput.trim());
+                                                return next;
+                                            });
+                                            setCustomComponentInput('');
+                                        }
+                                    }}
+                                />
+                                <button className="add-custom-btn" onClick={() => {
+                                    if (customComponentInput.trim()) {
+                                        setCustomComponents(prev => [...prev, customComponentInput.trim()]);
+                                        setCheckedComponents(curr => {
+                                            const next = new Set(curr);
+                                            next.add(customComponentInput.trim());
+                                            return next;
+                                        });
+                                        setCustomComponentInput('');
+                                    }
+                                }}>Add</button>
+                            </div>
+
+                            <div className="curated-checklist">
+                                {[...DEFAULT_RECOMMENDED_COMPONENTS, ...customComponents].map((comp, idx) => {
+                                    const isChecked = checkedComponents.has(comp);
+                                    return (
+                                        <label key={idx} className={`checklist-item ${isChecked ? 'checked' : ''}`}>
+                                            <input 
+                                                type="checkbox" 
+                                                checked={isChecked}
+                                                onChange={() => {
+                                                    setCheckedComponents(curr => {
+                                                        const next = new Set(curr);
+                                                        if (next.has(comp)) next.delete(comp);
+                                                        else next.add(comp);
+                                                        return next;
+                                                    });
+                                                }}
+                                            />
+                                            <span className="checklist-label">{comp}</span>
+                                        </label>
+                                    );
+                                })}
+                            </div>
+
+                            <button 
+                                className="inject-blueprints-btn pulsing"
+                                onClick={handleInjectSelectedBlueprints}
+                                disabled={isInjecting || isTailoring}
+                            >
+                                {isInjecting ? <ThinkingIcon /> : '⚡ Inject Selected Components & Modes'}
+                            </button>
+                        </div>
+                    )}
+
+                    {subTab === 'integrations' && (
+                        <div className="sub-components-panel">
+                            <p className="tab-instructions">Toggle real-time Firebase syncing, file exports, or automated Google Workspace integrations into the HTML draft stencils.</p>
+                            
+                            <div className="add-custom-row">
+                                <input 
+                                    type="text" 
+                                    placeholder="Add custom workspace/database task context..." 
+                                    value={customIntegrationInput}
+                                    className="custom-input-box"
+                                    onChange={(e) => setCustomIntegrationInput(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && customIntegrationInput.trim()) {
+                                            setCustomIntegrations(prev => [...prev, customIntegrationInput.trim()]);
+                                            setCheckedIntegrations(curr => {
+                                                const next = new Set(curr);
+                                                next.add(customIntegrationInput.trim());
+                                                return next;
+                                            });
+                                            setCustomIntegrationInput('');
+                                        }
+                                    }}
+                                />
+                                <button className="add-custom-btn" onClick={() => {
+                                    if (customIntegrationInput.trim()) {
+                                        setCustomIntegrations(prev => [...prev, customIntegrationInput.trim()]);
+                                        setCheckedIntegrations(curr => {
+                                            const next = new Set(curr);
+                                            next.add(customIntegrationInput.trim());
+                                            return next;
+                                        });
+                                        setCustomIntegrationInput('');
+                                    }
+                                }}>Add</button>
+                            </div>
+
+                            <div className="curated-checklist">
+                                {[...DEFAULT_INTEGRATIONS.map(i => i.name), ...customIntegrations].map((item, idx) => {
+                                    const isChecked = checkedIntegrations.has(item);
+                                    const desc = DEFAULT_INTEGRATIONS.find(i => i.name === item)?.desc || "Custom added AI integration requirement.";
+                                    return (
+                                        <label key={idx} className={`checklist-item has-desc ${isChecked ? 'checked' : ''}`}>
+                                            <div className="checkbox-wrap">
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={isChecked}
+                                                    onChange={() => {
+                                                        setCheckedIntegrations(curr => {
+                                                            const next = new Set(curr);
+                                                            if (next.has(item)) next.delete(item);
+                                                            else next.add(item);
+                                                            return next;
+                                                        });
+                                                    }}
+                                                />
+                                            </div>
+                                            <div className="checklist-texts">
+                                                <span className="checklist-label-strong">{item}</span>
+                                                <span className="checklist-desc">{desc}</span>
+                                            </div>
+                                        </label>
+                                    );
+                                })}
+                            </div>
+
+                            <button 
+                                className="inject-blueprints-btn pulsing"
+                                onClick={handleInjectSelectedBlueprints}
+                                disabled={isInjecting || isTailoring}
+                            >
+                                {isInjecting ? <ThinkingIcon /> : '⚡ Inject Selected Workspaces & AI Sync'}
+                            </button>
+                        </div>
+                    )}
+
+                    {subTab === 'apis' && (
+                        <div className="sub-components-panel">
+                            <p className="tab-instructions">Configure microservices, payment tunnels, SMTP servers, geographic feeds, or Github webhooks with live interactive states.</p>
+                            
+                            <div className="add-custom-row">
+                                <input 
+                                    type="text" 
+                                    placeholder="Add custom Webhook / REST API routing..." 
+                                    className="custom-input-box"
+                                    value={customAPIInput}
+                                    onChange={(e) => setCustomAPIInput(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && customAPIInput.trim()) {
+                                            setCustomAPIs(prev => [...prev, customAPIInput.trim()]);
+                                            setCheckedAPIs(curr => {
+                                                const next = new Set(curr);
+                                                next.add(customAPIInput.trim());
+                                                return next;
+                                            });
+                                            setCustomAPIInput('');
+                                        }
+                                    }}
+                                />
+                                <button className="add-custom-btn" onClick={() => {
+                                    if (customAPIInput.trim()) {
+                                        setCustomAPIs(prev => [...prev, customAPIInput.trim()]);
+                                        setCheckedAPIs(curr => {
+                                            const next = new Set(curr);
+                                            next.add(customAPIInput.trim());
+                                            return next;
+                                        });
+                                        setCustomAPIInput('');
+                                    }
+                                }}>Add</button>
+                            </div>
+
+                            <div className="curated-checklist">
+                                {[...DEFAULT_APIS.map(a => a.name), ...customAPIs].map((item, idx) => {
+                                    const isChecked = checkedAPIs.has(item);
+                                    const apiObj = DEFAULT_APIS.find(a => a.name === item);
+                                    const desc = apiObj ? `${apiObj.type} • ${apiObj.desc}` : "Custom added API / Webhook trigger routing.";
+                                    return (
+                                        <label key={idx} className={`checklist-item has-desc ${isChecked ? 'checked' : ''}`}>
+                                            <div className="checkbox-wrap">
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={isChecked}
+                                                    onChange={() => {
+                                                        setCheckedAPIs(curr => {
+                                                            const next = new Set(curr);
+                                                            if (next.has(item)) next.delete(item);
+                                                            else next.add(item);
+                                                            return next;
+                                                        });
+                                                    }}
+                                                />
+                                            </div>
+                                            <div className="checklist-texts">
+                                                <span className="checklist-label-strong">{item}</span>
+                                                <span className="checklist-desc">{desc}</span>
+                                            </div>
+                                        </label>
+                                    );
+                                })}
+                            </div>
+
+                            <button 
+                                className="inject-blueprints-btn pulsing"
+                                onClick={handleInjectSelectedBlueprints}
+                                disabled={isInjecting || isTailoring}
+                            >
+                                {isInjecting ? <ThinkingIcon /> : '⚡ Inject Selected Actions & Webhooks'}
+                            </button>
                         </div>
                     )}
                 </div>

@@ -751,6 +751,96 @@ html, body {
     box-shadow: 0 0 20px rgba(255,255,255,0.2);
 }
 
+.empty-dropzone {
+    width: 100%;
+    max-width: 480px;
+    margin-top: 15px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px dashed rgba(255, 255, 255, 0.15);
+    border-radius: 16px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    animation: dramaticEntrance 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation-delay: 0.9s;
+    opacity: 0;
+}
+
+.empty-dropzone:hover, .empty-dropzone.dragging {
+    background: rgba(255, 0, 128, 0.04);
+    border-color: var(--neon-pink);
+    box-shadow: 0 0 15px rgba(255, 0, 128, 0.15);
+}
+
+.dropzone-text {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    color: var(--neon-pink);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    text-shadow: 0 0 8px rgba(255, 0, 128, 0.4);
+}
+
+.dropzone-sub {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.4);
+    line-height: 1.4;
+    max-width: 320px;
+}
+
+.empty-attachments-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    max-width: 480px;
+    margin-top: 10px;
+}
+
+.empty-attachment-tag {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 99px;
+    padding: 4px 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    color: #fff;
+    animation: dramaticEntrance 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.empty-attachment-tag .file-name {
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.empty-attachment-tag .remove-btn {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 0.95rem;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    margin-left: 4px;
+    transition: color 0.15s ease;
+}
+
+.empty-attachment-tag .remove-btn:hover {
+    color: var(--neon-pink);
+}
+
 .recommendations-grid {
     display: flex;
     flex-wrap: wrap;
@@ -1783,6 +1873,263 @@ html, body {
     padding: 2px 8px;
     border-radius: 4px;
     text-transform: uppercase;
+}
+
+/* Custom Blueprint Tabs Grid */
+.blueprint-tabs {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    background: rgba(0, 0, 0, 0.25);
+    padding: 4px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    margin-bottom: 4px;
+}
+
+.blueprint-tab {
+    background: none;
+    border: none;
+    padding: 8px 4px;
+    border-radius: 8px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+}
+
+.blueprint-tab:hover {
+    background: rgba(255, 255, 255, 0.03);
+    color: #fff;
+}
+
+.blueprint-tab.active {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--neon-pink);
+    border: 1px solid rgba(255, 0, 128, 0.25);
+    box-shadow: 0 0 10px rgba(255, 0, 128, 0.1);
+}
+
+/* Injection Status Banner pointer */
+.injection-status-banner {
+    background: rgba(255, 0, 128, 0.08);
+    border: 1px solid rgba(255, 0, 128, 0.2);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 0.78rem;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+    animation: pulseGlow 2s infinite ease-in-out;
+}
+
+.pulse-bullet {
+    width: 8px;
+    height: 8px;
+    background-color: var(--neon-pink);
+    border-radius: 50%;
+    display: inline-block;
+    box-shadow: 0 0 10px var(--neon-pink);
+}
+
+@keyframes pulseGlow {
+    0%, 100% { box-shadow: 0 0 5px rgba(255, 0, 128, 0.1); }
+    50% { box-shadow: 0 0 15px rgba(255, 0, 128, 0.35); }
+}
+
+/* Checklist Panel Styles */
+.sub-components-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.tab-instructions {
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.5);
+    line-height: 1.4;
+    margin: 0;
+}
+
+.add-custom-row {
+    display: flex;
+    gap: 8px;
+}
+
+.custom-input-box {
+    flex: 1;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 0.8rem;
+    color: #fff;
+    transition: all 0.2s ease;
+}
+
+.custom-input-box:focus {
+    outline: none;
+    border-color: rgba(255, 255, 255, 0.2);
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.add-custom-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    padding: 0 14px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.add-custom-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Master Curated Checklist Container */
+.curated-checklist {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 280px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.curated-checklist::-webkit-scrollbar {
+    width: 6px;
+}
+
+.curated-checklist::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+}
+
+.checklist-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 10px;
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.checklist-item:hover {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+.checklist-item.checked {
+    background: rgba(255, 0, 128, 0.03);
+    border-color: rgba(255, 0, 128, 0.15);
+}
+
+.checklist-item input[type="checkbox"] {
+    accent-color: var(--neon-pink);
+    width: 15px;
+    height: 15px;
+    cursor: pointer;
+}
+
+.checklist-label {
+    font-size: 0.82rem;
+    color: rgba(255, 255, 255, 0.8);
+    font-weight: 500;
+}
+
+.checklist-item.checked .checklist-label {
+    color: #fff;
+}
+
+.checklist-item.has-desc {
+    align-items: flex-start;
+}
+
+.checkbox-wrap {
+    padding-top: 2px;
+}
+
+.checklist-texts {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.checklist-label-strong {
+    font-size: 0.82rem;
+    color: #fff;
+    font-weight: 600;
+}
+
+.checklist-desc {
+    font-size: 0.72rem;
+    color: rgba(255, 255, 255, 0.4);
+    line-height: 1.3;
+}
+
+/* Master Inject Button */
+.inject-blueprints-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: linear-gradient(135deg, var(--neon-pink) 0%, #ff4b91 100%);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    cursor: pointer;
+    margin-top: 6px;
+    box-shadow: 0 4px 15px rgba(255, 0, 128, 0.3);
+    transition: all 0.2s ease;
+}
+
+.inject-blueprints-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(255, 0, 128, 0.45);
+    background: linear-gradient(135deg, #ff1a8c 0%, #ff6da6 100%);
+}
+
+.inject-blueprints-btn:disabled {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.3);
+    box-shadow: none;
+    cursor: not-allowed;
+}
+
+.ai-tailor-btn {
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: #fff !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+}
+
+.ai-tailor-btn:hover {
+    background: rgba(255, 255, 255, 0.15) !important;
+    border-color: rgba(255, 255, 255, 0.25) !important;
+}
+
+.recommended-empty-tip {
+    font-size: 0.82rem;
+    color: rgba(255, 255, 255, 0.45);
+    text-align: center;
+    padding: 40px 20px;
+    border: 1px dashed rgba(255, 255, 255, 0.06);
+    border-radius: 14px;
 }
 
 .code-block.mini {

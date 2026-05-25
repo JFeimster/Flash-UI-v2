@@ -563,6 +563,36 @@ Return ONLY the complete updated raw HTML/CSS. No Markdown, no explanations.\n\n
         }
     }, []);
 
+    const generateTailoredRecommendations = useCallback(async (currentPrompt: string, html: string) => {
+        try {
+            const ai = getAiClient();
+            const prompt = `Analyze this UI component design: "${currentPrompt}" with code "${html.substring(0, 1500)}...".
+Suggest:
+1. Three customized components or layout modes specifically matching this project that should be added/built.
+2. Two custom AI features/integrations.
+3. Two specific REST API triggers or webhooks.
+
+Return ONLY a JSON object of arrays:
+{
+  "components": ["...", "...", "..."],
+  "integrations": ["...", "..."],
+  "apis": ["...", "..."]
+}`;
+            
+            const result = await withRetry(() => ai.models.generateContent({
+                model: 'gemini-3.5-flash',
+                contents: [{ parts: [{ text: prompt }], role: 'user' }],
+                config: { responseMimeType: 'application/json' }
+            })) as GenerateContentResponse;
+
+            const parsed = JSON.parse(result.text || '{}');
+            return parsed;
+        } catch (e) {
+            console.error("Error generating tailored recommendations:", e);
+            return { components: [], integrations: [], apis: [] };
+        }
+    }, [sessions]);
+
     const suggestComponents = useCallback(async (currentPrompt: string) => {
         try {
             const ai = getAiClient();
@@ -718,6 +748,7 @@ STRICT REQUIREMENTS:
         generateRecommendedPages,
         applyAnimation,
         suggestComponents,
-        generateAdditionalFile
+        generateAdditionalFile,
+        generateTailoredRecommendations
     };
 }

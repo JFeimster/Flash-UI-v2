@@ -7,7 +7,8 @@
 import React, { useRef, useEffect, useState } from 'react';
 import ArtifactCard from './ArtifactCard';
 import { SparklesIcon, SearchIcon } from './Icons';
-import { Session } from '../types';
+import { Session, Attachment } from '../types';
+import { UploadCloud, Paperclip } from 'lucide-react';
 
 interface SessionDeckProps {
     sessions: Session[];
@@ -18,6 +19,8 @@ interface SessionDeckProps {
     isLoading: boolean;
     onSurpriseMe: () => void;
     onRecommendationClick?: (prompt: string) => void;
+    attachments: Attachment[];
+    setAttachments: React.Dispatch<React.SetStateAction<Attachment[]>>;
 }
 
 const RECOMMENDATIONS = [
@@ -36,10 +39,42 @@ export default function SessionDeck({
     hasStarted,
     isLoading,
     onSurpriseMe,
-    onRecommendationClick
+    onRecommendationClick,
+    attachments,
+    setAttachments
 }: SessionDeckProps) {
     const gridScrollRef = useRef<HTMLDivElement>(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [isDragging, setIsDragging] = useState(false);
+    const emptyFileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleEmptyStateFiles = async (files: File[]) => {
+        const newAttachments: Attachment[] = [];
+        for (const file of files) {
+            const reader = new FileReader();
+            const promise = new Promise<void>((resolve) => {
+                reader.onload = (event) => {
+                    const base64 = (event.target?.result as string).split(',')[1];
+                    newAttachments.push({
+                        id: Math.random().toString(36).substring(7),
+                        name: file.name,
+                        mimeType: file.type || 'application/octet-stream',
+                        data: base64,
+                        size: file.size
+                    });
+                    resolve();
+                };
+                reader.readAsDataURL(file);
+            });
+            await promise;
+        }
+        setAttachments(prev => [...prev, ...newAttachments]);
+        
+        const ta = document.querySelector('.styled-textarea') as HTMLTextAreaElement;
+        if (ta) {
+            ta.focus();
+        }
+    };
 
     // Fix for mobile: reset scroll when focusing an item
     useEffect(() => {
@@ -106,6 +141,56 @@ export default function SessionDeck({
                      <button className="surprise-button" onClick={onSurpriseMe} disabled={isLoading} title="Generate a random UI">
                          <SparklesIcon /> Surprise Me
                      </button>
+
+                     <div 
+                         className={`empty-dropzone ${isDragging ? 'dragging' : ''}`}
+                         onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
+                         onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); }}
+                         onDrop={async (e) => {
+                             e.preventDefault();
+                             e.stopPropagation();
+                             setIsDragging(false);
+                             if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                                  await handleEmptyStateFiles(Array.from(e.dataTransfer.files));
+                             }
+                         }}
+                         onClick={() => emptyFileInputRef.current?.click()}
+                     >
+                         <input 
+                             type="file"
+                             ref={emptyFileInputRef}
+                             style={{ display: 'none' }}
+                             multiple
+                             onChange={async (e) => {
+                                 if (e.target.files && e.target.files.length > 0) {
+                                     await handleEmptyStateFiles(Array.from(e.target.files));
+                                 }
+                             }}
+                         />
+                         <UploadCloud size={24} style={{ marginBottom: '8px', color: 'var(--neon-pink)' }} />
+                         <div className="dropzone-text">GROUND WITH REFERENCE DATA OR DESIGN REFERENCE</div>
+                         <div className="dropzone-sub">Drag & Drop files or click to load (.png, .json, .csv, .txt, .zip) as context</div>
+                     </div>
+
+                     {attachments && attachments.length > 0 && (
+                         <div className="empty-attachments-list">
+                             {attachments.map((file) => (
+                                 <div key={file.id} className="empty-attachment-tag">
+                                     <Paperclip size={12} />
+                                     <span className="file-name">{file.name}</span>
+                                     <button 
+                                         className="remove-btn"
+                                         onClick={(e) => {
+                                             e.stopPropagation();
+                                             setAttachments(prev => prev.filter(f => f.id !== file.id));
+                                         }}
+                                     >
+                                         &times;
+                                     </button>
+                                 </div>
+                             ))}
+                         </div>
+                     )}
                  </div>
              </div>
 

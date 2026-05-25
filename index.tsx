@@ -116,7 +116,8 @@ function App() {
     generateRecommendedPages,
     applyAnimation,
     suggestComponents,
-    generateAdditionalFile
+    generateAdditionalFile,
+    generateTailoredRecommendations
   } = useGenAI();
 
   const {
@@ -131,6 +132,7 @@ function App() {
   } = useNavigation(sessions);
 
   const [inputValue, setInputValue] = useState<string>('');
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [suggestions, setSuggestions] = useState<SuggestedComponent[]>([]);
   const [showFeatures, setShowFeatures] = useState(false);
   const [isPromptCollapsed, setIsPromptCollapsed] = useState(false);
@@ -167,21 +169,23 @@ function App() {
     });
   }, []);
 
-  const handleSendMessage = useCallback((attachments: Attachment[] = [], contextUrl?: string) => {
-    if (inputValue.trim() || attachments.length > 0 || contextUrl) {
+  const handleSendMessage = useCallback((passedAttachments: Attachment[] = [], contextUrl?: string) => {
+    const finalAttachments = passedAttachments.length > 0 ? passedAttachments : attachments;
+    if (inputValue.trim() || finalAttachments.length > 0 || contextUrl) {
         if (currentSession && focusedArtifactIndex !== null) {
             // Revision Mode
             const artifact = currentSession.artifacts[focusedArtifactIndex];
-            reviseArtifact(currentSession.id, artifact.id, inputValue, attachments, contextUrl);
+            reviseArtifact(currentSession.id, artifact.id, inputValue, finalAttachments, contextUrl);
         } else {
             // New generation
-            sendMessage(inputValue, attachments, contextUrl);
+            sendMessage(inputValue, finalAttachments, contextUrl);
             setFocusedArtifactIndex(null); 
         }
         setSuggestions([]); // Clear suggestions on new send
         setInputValue('');
+        setAttachments([]);
     }
-  }, [inputValue, sendMessage, reviseArtifact, currentSession, focusedArtifactIndex, setFocusedArtifactIndex]);
+  }, [inputValue, sendMessage, reviseArtifact, currentSession, focusedArtifactIndex, setFocusedArtifactIndex, attachments]);
 
   const handleSuggestionClick = useCallback((suggestion: SuggestedComponent) => {
       setInputValue(suggestion.prompt);
@@ -400,6 +404,7 @@ function App() {
                 applyAnimation={applyAnimation}
                 generateAdditionalFile={generateAdditionalFile}
                 onUpdateArtifactFiles={handleUpdateArtifactFiles}
+                generateTailoredRecommendations={generateTailoredRecommendations}
                 onRefactorApply={(newHtml) => {
                     if (focusedArtifactIndex !== null) {
                         updateSessionArtifact(currentSessionIndex, focusedArtifactIndex, newHtml);
@@ -429,6 +434,8 @@ function App() {
                 isLoading={isLoading}
                 onSurpriseMe={handleSurpriseMe}
                 onRecommendationClick={handleTemplateClick}
+                attachments={attachments}
+                setAttachments={setAttachments}
             />
 
              {canGoBack && (
@@ -528,6 +535,8 @@ function App() {
                 hasStarted={hasStarted}
                 isCollapsed={isPromptCollapsed}
                 onCollapse={() => setIsPromptCollapsed(true)}
+                attachments={attachments}
+                setAttachments={setAttachments}
             />
 
             {/* Immersive Fullscreen Popout Modal */}

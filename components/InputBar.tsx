@@ -27,6 +27,8 @@ interface InputBarProps {
     isCollapsed?: boolean;
     onCollapse?: () => void;
     hasStarted?: boolean;
+    attachments: Attachment[];
+    setAttachments: React.Dispatch<React.SetStateAction<Attachment[]>>;
 }
 
 export default function InputBar({ 
@@ -43,11 +45,12 @@ export default function InputBar({
     artifactName,
     isCollapsed = false,
     onCollapse,
-    hasStarted = false
+    hasStarted = false,
+    attachments,
+    setAttachments
 }: InputBarProps) {
     const [placeholderIndex, setPlaceholderIndex] = useState(0);
     const [placeholders, setPlaceholders] = useState<string[]>(INITIAL_PLACEHOLDERS);
-    const [attachments, setAttachments] = useState<Attachment[]>([]);
     const [contextUrl, setContextUrl] = useState('');
     const [showUrlInput, setShowUrlInput] = useState(false);
     const [isExpanded, setIsExpanded] = useState(false);
