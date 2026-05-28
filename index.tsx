@@ -337,10 +337,6 @@ function App() {
 
   return (
     <>
-        <a href="https://x.com/ammaar" target="_blank" rel="noreferrer" className={`creator-credit ${hasStarted ? 'hide-on-mobile' : ''}`}>
-            created by @ammaar
-        </a>
-
         <div className="nav-menu">
             {focusedArtifactIndex !== null ? (
                 <div className="flex items-center gap-3">
@@ -618,59 +614,59 @@ function App() {
                 attachments={attachments}
                 setAttachments={setAttachments}
             />
+        </div>
 
-            {/* Immersive Fullscreen Popout Modal */}
-            {isImmersiveModalOpen && currentSession && focusedArtifactIndex !== null && (
-                <div className="fullscreen-popout-overlay" onClick={() => setIsImmersiveModalOpen(false)}>
-                    <div className="fullscreen-popout-content" onClick={(e) => e.stopPropagation()}>
-                        <div className="fullscreen-popout-header">
-                            <div className="flex items-center gap-4">
-                                <span className="popout-title">{currentSession.artifacts[focusedArtifactIndex].styleName}</span>
-                                <span className="popout-subtitle font-mono">Full-Scale Popout View</span>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <button 
-                                    className={`responsive-btn-pill ${popoutWidth === '375px' ? 'active' : ''}`}
-                                    onClick={() => setPopoutWidth('375px')}
-                                    title="Mobile Preview"
-                                >
-                                    Mobile
-                                </button>
-                                <button 
-                                    className={`responsive-btn-pill ${popoutWidth === '768px' ? 'active' : ''}`}
-                                    onClick={() => setPopoutWidth('768px')}
-                                    title="Tablet Preview"
-                                >
-                                    Tablet
-                                </button>
-                                <button 
-                                    className={`responsive-btn-pill ${popoutWidth === '100%' ? 'active' : ''}`}
-                                    onClick={() => setPopoutWidth('100%')}
-                                    title="Desktop Preview"
-                                >
-                                    Desktop
-                                </button>
-
-                                <button 
-                                    className="close-fullscreen-btn font-bold"
-                                    onClick={() => setIsImmersiveModalOpen(false)}
-                                >
-                                    Exit Popout
-                                </button>
-                            </div>
+        {/* Immersive Fullscreen Popout Modal */}
+        {isImmersiveModalOpen && currentSession && focusedArtifactIndex !== null && (
+            <div className="fullscreen-popout-overlay" onClick={() => setIsImmersiveModalOpen(false)}>
+                <div className="fullscreen-popout-content" onClick={(e) => e.stopPropagation()}>
+                    <div className="fullscreen-popout-header">
+                        <div className="flex items-center gap-4">
+                            <span className="popout-title">{currentSession.artifacts[focusedArtifactIndex].styleName}</span>
+                            <span className="popout-subtitle font-mono">Full-Scale Popout View</span>
                         </div>
-                        <div className="fullscreen-iframe-container" style={{ width: popoutWidth }}>
-                            <iframe 
-                                srcDoc={currentSession.artifacts[focusedArtifactIndex].html} 
-                                title="fullscreen-preview"
-                                sandbox="allow-scripts allow-forms allow-modals allow-popups allow-presentation allow-same-origin"
-                                className="fullscreen-iframe"
-                            />
+                        <div className="flex items-center gap-3">
+                            <button 
+                                className={`responsive-btn-pill ${popoutWidth === '375px' ? 'active' : ''}`}
+                                onClick={() => setPopoutWidth('375px')}
+                                title="Mobile Preview"
+                            >
+                                Mobile
+                            </button>
+                            <button 
+                                className={`responsive-btn-pill ${popoutWidth === '768px' ? 'active' : ''}`}
+                                onClick={() => setPopoutWidth('768px')}
+                                title="Tablet Preview"
+                            >
+                                Tablet
+                            </button>
+                            <button 
+                                className={`responsive-btn-pill ${popoutWidth === '100%' ? 'active' : ''}`}
+                                onClick={() => setPopoutWidth('100%')}
+                                title="Desktop Preview"
+                            >
+                                Desktop
+                            </button>
+
+                            <button 
+                                className="close-fullscreen-btn font-bold"
+                                onClick={() => setIsImmersiveModalOpen(false)}
+                            >
+                                Exit Popout
+                            </button>
                         </div>
                     </div>
+                    <div className="fullscreen-iframe-container" style={{ width: popoutWidth }}>
+                        <iframe 
+                            srcDoc={currentSession.artifacts[focusedArtifactIndex].html} 
+                            title="fullscreen-preview"
+                            sandbox="allow-scripts allow-forms allow-modals allow-popups allow-presentation allow-same-origin"
+                            className="fullscreen-iframe"
+                        />
+                    </div>
                 </div>
-            )}
-        </div>
+            </div>
+        )}
     </>
   );
 }

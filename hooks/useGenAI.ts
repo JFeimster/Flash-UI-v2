@@ -39,6 +39,16 @@ const shouldSendAsText = (mimeType: string, filename: string): boolean => {
     return textExtensions.some(ext => name.endsWith(ext));
 };
 
+export const cleanHtmlString = (html: string): string => {
+    if (!html) return '';
+    let cleaned = html.trim();
+    // Remove starting ```html or ```xml or ```Markdown or ```
+    cleaned = cleaned.replace(/^```(?:html|xml|markdown)?\s*\n?/i, '');
+    // Remove ending ```
+    cleaned = cleaned.replace(/\s*\n?```$/i, '');
+    return cleaned;
+};
+
 export const useGenAI = () => {
     // Initialize state from localStorage
     const [userApiKey, setUserApiKey] = useState<string>(() => {
@@ -337,13 +347,13 @@ STRICT REQUIREMENTS:
                         accumulatedHtml += chunk.text || '';
                         setSessions(prev => prev.map(sess => sess.id === sessionId ? {
                             ...sess,
-                            artifacts: sess.artifacts.map(art => art.id === artifact.id ? { ...art, html: accumulatedHtml } : art)
+                            artifacts: sess.artifacts.map(art => art.id === artifact.id ? { ...art, html: cleanHtmlString(accumulatedHtml) } : art)
                         } : sess));
                     }
 
                     setSessions(prev => prev.map(sess => sess.id === sessionId ? {
                         ...sess,
-                        artifacts: sess.artifacts.map(art => art.id === artifact.id ? { ...art, status: 'complete' } : art)
+                        artifacts: sess.artifacts.map(art => art.id === artifact.id ? { ...art, html: cleanHtmlString(accumulatedHtml), status: 'complete' } : art)
                     } : sess));
                 } catch (e) {
                     console.error(`Artifact generation failed for ${artifact.id}:`, e);
@@ -368,7 +378,7 @@ STRICT REQUIREMENTS:
             i === sessionIndex ? {
                 ...sess,
                 artifacts: sess.artifacts.map((art, j) => 
-                  j === artifactIndex ? { ...art, html, status: 'complete' } : art
+                  j === artifactIndex ? { ...art, html: cleanHtmlString(html), status: 'complete' } : art
                 )
             } : sess
         ));
@@ -758,13 +768,13 @@ STRICT REQUIREMENTS:
                 accumulatedHtml += chunk.text || '';
                 setSessions(prev => prev.map(sess => sess.id === sessionId ? {
                     ...sess,
-                    artifacts: sess.artifacts.map(art => art.id === artifactId ? { ...art, html: accumulatedHtml } : art)
+                    artifacts: sess.artifacts.map(art => art.id === artifactId ? { ...art, html: cleanHtmlString(accumulatedHtml) } : art)
                 } : sess));
             }
 
             setSessions(prev => prev.map(sess => sess.id === sessionId ? {
                 ...sess,
-                artifacts: sess.artifacts.map(art => art.id === artifactId ? { ...art, status: 'complete' } : art)
+                artifacts: sess.artifacts.map(art => art.id === artifactId ? { ...art, html: cleanHtmlString(accumulatedHtml), status: 'complete' } : art)
             } : sess));
 
         } catch (e) {

@@ -223,7 +223,7 @@ export default function SessionDeck({
                         <div key={session.id} className={`session-group ${positionClass}`}>
                             <div className="artifact-grid" ref={sIndex === currentSessionIndex ? gridScrollRef : null}>
                                 {session.artifacts.map((artifact, aIndex) => {
-                                    const isFocused = focusedArtifactIndex === aIndex;
+                                    const isFocused = sIndex === currentSessionIndex && focusedArtifactIndex === aIndex;
                                     
                                     return (
                                         <ArtifactCard 

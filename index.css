@@ -1174,9 +1174,9 @@ html, body {
 
 .stage-container.mode-focus .artifact-card.focused {
     position: fixed;
-    top: 86px; left: 50%;
-    width: 96vw; max-width: 1560px;
-    height: calc(100vh - 170px);
+    top: 76px; left: 50%;
+    width: 98vw; max-width: 1720px;
+    height: calc(100vh - 120px);
     transform: translateX(-50%) !important;
     z-index: 100;
     opacity: 1;
@@ -2735,9 +2735,9 @@ html, body {
     }
 
     .stage-container.mode-focus .artifact-card.focused {
-        width: 96vw;
-        height: calc(100vh - 170px); 
-        top: 86px;
+        width: 98vw;
+        height: calc(100vh - 120px); 
+        top: 76px;
         left: 50%;
         transform: translateX(-50%) !important;
     }
