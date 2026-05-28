@@ -1,0 +1,98 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile containing settings and configurations",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The unique Firebase Auth UID of the user"
+        },
+        "email": {
+          "type": "string",
+          "description": "The verified email address of the user"
+        },
+        "userApiKey": {
+          "type": "string",
+          "description": "Personalized Gemini API Key stored securely in Firestore"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp"
+        }
+      },
+      "required": ["id", "createdAt"]
+    },
+    "Attachment": {
+      "title": "Attachment",
+      "description": "File attachment metadata and base64 payload used in custom prompt generation",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "mimeType": { "type": "string" },
+        "data": { "type": "string" },
+        "size": { "type": "number" }
+      },
+      "required": ["id", "name", "mimeType", "data", "size"]
+    },
+    "Artifact": {
+      "title": "Artifact",
+      "description": "A generated UI component artifact containing style details and full html",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "styleName": { "type": "string" },
+        "html": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["streaming", "complete", "error"]
+        },
+        "isFavorite": { "type": "boolean" },
+        "isSaved": { "type": "boolean" },
+        "additionalFiles": {
+          "type": "object",
+          "description": "Map of path strings to code contents for multi-file components"
+        }
+      },
+      "required": ["id", "styleName", "html", "status"]
+    },
+    "Session": {
+      "title": "Session",
+      "description": "An interactive generations group representing a single prompt-centric conversation deck",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "prompt": { "type": "string" },
+        "timestamp": { "type": "number" },
+        "artifacts": {
+          "type": "array",
+          "description": "List of artifacts for this session"
+        },
+        "attachments": {
+          "type": "array",
+          "description": "List of attachments attached to initial query"
+        },
+        "contextUrl": { "type": "string" }
+      },
+      "required": ["id", "userId", "prompt", "timestamp", "artifacts"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Top-level collection mapping Firebase UIDs to user configurations"
+    },
+    "/users/{userId}/sessions/{sessionId}": {
+      "schema": "Session",
+      "description": "Sub-collection containing generation chat sessions made by the user"
+    },
+    "/users/{userId}/savedArtifacts/{artifactId}": {
+      "schema": "Artifact",
+      "description": "Sub-collection containing user-saved standalone components/artifacts"
+    }
+  }
+}

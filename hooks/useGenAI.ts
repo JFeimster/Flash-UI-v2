@@ -8,6 +8,8 @@ import { useState, useCallback, useEffect } from 'react';
 import { GoogleGenAI, GenerateContentResponse } from '@google/genai';
 import { generateId, withRetry } from '../utils';
 import { Session, Artifact, ComponentVariation, SuggestedComponent, Attachment } from '../types';
+import { db, auth, loginWithGoogle, logoutUser, handleFirestoreError, OperationType } from '../utils/firebase';
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, getDocs, collection, getDocFromServer } from 'firebase/firestore';
 
 const STORAGE_KEY = 'flash_ui_sessions_v1';
 const SAVED_KEY = 'flash_ui_saved_v1';
@@ -50,34 +52,13 @@ export const cleanHtmlString = (html: string): string => {
 };
 
 export const useGenAI = () => {
-    // Initialize state from localStorage
-    const [userApiKey, setUserApiKey] = useState<string>(() => {
-        try {
-            return localStorage.getItem(API_KEY_STORAGE_KEY) || '';
-        } catch {
-            return '';
-        }
-    });
+    const [currentUser, setCurrentUser] = useState<any>(null);
+    const [authLoading, setAuthLoading] = useState<boolean>(true);
 
-    const [sessions, setSessions] = useState<Session[]>(() => {
-        try {
-            const saved = localStorage.getItem(STORAGE_KEY);
-            return saved ? JSON.parse(saved) : [];
-        } catch (e) {
-            console.warn('Failed to load sessions from local storage', e);
-            return [];
-        }
-    });
-
-    const [savedArtifacts, setSavedArtifacts] = useState<Artifact[]>(() => {
-        try {
-            const saved = localStorage.getItem(SAVED_KEY);
-            return saved ? JSON.parse(saved) : [];
-        } catch (e) {
-            console.warn('Failed to load saved artifacts from local storage', e);
-            return [];
-        }
-    });
+    // Initialize state
+    const [userApiKey, setUserApiKey] = useState<string>('');
+    const [sessions, setSessions] = useState<Session[]>([]);
+    const [savedArtifacts, setSavedArtifacts] = useState<Artifact[]>([]);
 
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [componentVariations, setComponentVariations] = useState<ComponentVariation[]>([]);
@@ -88,24 +69,108 @@ export const useGenAI = () => {
         quotaInfo?: string;
     }>({ isValid: null, error: null });
 
-    // Persist to localStorage with debounce
+    // === Firebase Connection Validation and Auth Monitor ===
     useEffect(() => {
-        const handler = setTimeout(() => {
+        const testConnection = async () => {
             try {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
-                localStorage.setItem(SAVED_KEY, JSON.stringify(savedArtifacts));
-                if (userApiKey) {
-                    localStorage.setItem(API_KEY_STORAGE_KEY, userApiKey);
+                await getDocFromServer(doc(db, 'test', 'connection'));
+            } catch (error) {
+                if (error instanceof Error && error.message.includes('the client is offline')) {
+                    console.error("Please check your Firebase configuration.");
+                }
+            }
+        };
+        testConnection();
+
+        const unsubscribe = auth.onAuthStateChanged(async (user) => {
+            setCurrentUser(user);
+            if (user) {
+                setAuthLoading(true);
+                try {
+                    // Load or init user document
+                    const userDocRef = doc(db, 'users', user.uid);
+                    const userDoc = await getDoc(userDocRef);
+                    if (!userDoc.exists()) {
+                        await setDoc(userDocRef, {
+                            id: user.uid,
+                            email: user.email,
+                            createdAt: new Date().toISOString()
+                        });
+                    } else {
+                        const userData = userDoc.data();
+                        if (userData && userData.userApiKey) {
+                            setUserApiKey(userData.userApiKey);
+                        }
+                    }
+
+                    // Load user sessions
+                    const sessionsSnap = await getDocs(collection(db, 'users', user.uid, 'sessions'));
+                    const loadedSessions: Session[] = [];
+                    sessionsSnap.forEach((docSnap) => {
+                        loadedSessions.push(docSnap.data() as Session);
+                    });
+                    loadedSessions.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+                    setSessions(loadedSessions);
+
+                    // Load user saved artifacts
+                    const savedSnap = await getDocs(collection(db, 'users', user.uid, 'savedArtifacts'));
+                    const loadedSaved: Artifact[] = [];
+                    savedSnap.forEach((docSnap) => {
+                        loadedSaved.push(docSnap.data() as Artifact);
+                    });
+                    setSavedArtifacts(loadedSaved);
+                } catch (e) {
+                    console.error("Failed to load user data from Firestore:", e);
+                } finally {
+                    setAuthLoading(false);
+                }
+            } else {
+                // Not authenticated, fallback to local storage
+                try {
+                    const localApiKey = localStorage.getItem(API_KEY_STORAGE_KEY) || '';
+                    setUserApiKey(localApiKey);
+
+                    const localSessions = localStorage.getItem(STORAGE_KEY);
+                    setSessions(localSessions ? JSON.parse(localSessions) : []);
+
+                    const localSaved = localStorage.getItem(SAVED_KEY);
+                    setSavedArtifacts(localSaved ? JSON.parse(localSaved) : []);
+                } catch (e) {
+                    console.warn('Failed to load state from local storage', e);
+                }
+                setAuthLoading(false);
+            }
+        });
+
+        return () => unsubscribe();
+    }, []);
+
+    // Persist to localStorage only when user is NOT logged in or debounce userApiKey write
+    useEffect(() => {
+        const handler = setTimeout(async () => {
+            try {
+                if (!auth.currentUser) {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+                    localStorage.setItem(SAVED_KEY, JSON.stringify(savedArtifacts));
+                    if (userApiKey) {
+                        localStorage.setItem(API_KEY_STORAGE_KEY, userApiKey);
+                    } else {
+                        localStorage.removeItem(API_KEY_STORAGE_KEY);
+                    }
                 } else {
-                    localStorage.removeItem(API_KEY_STORAGE_KEY);
+                    const user = auth.currentUser;
+                    const userDocRef = doc(db, 'users', user.uid);
+                    await updateDoc(userDocRef, {
+                        userApiKey: userApiKey
+                    }).catch(() => {});
                 }
             } catch (e) {
-                console.warn('Failed to save state to local storage', e);
+                console.warn('Failed to sync settings', e);
             }
         }, 1000);
 
         return () => clearTimeout(handler);
-    }, [sessions, savedArtifacts, userApiKey]);
+    }, [sessions, savedArtifacts, userApiKey, currentUser]);
 
     const validateApiKey = useCallback(async (key: string) => {
         if (!key) {
@@ -258,7 +323,7 @@ Required JSON Output Format (stream ONE object per line):
             id: `${sessionId}_${i}`,
             styleName: 'Designing...',
             html: '',
-            status: 'streaming',
+            status: 'streaming' as const,
         }));
 
         const newSession: Session = {
@@ -267,10 +332,18 @@ Required JSON Output Format (stream ONE object per line):
             timestamp: baseTime,
             artifacts: placeholderArtifacts,
             attachments: attachments,
-            contextUrl: contextUrl
+            contextUrl: contextUrl || ""
         };
 
         setSessions(prev => [...prev, newSession]);
+
+        const user = auth.currentUser;
+        if (user) {
+            setDoc(doc(db, 'users', user.uid, 'sessions', sessionId), {
+                ...newSession,
+                userId: user.uid
+            }).catch(err => handleFirestoreError(err, OperationType.CREATE, `users/${user.uid}/sessions/${sessionId}`));
+        }
 
         try {
             const ai = getAiClient();
@@ -289,10 +362,23 @@ Required JSON Output Format (stream ONE object per line):
                 if (match) generatedStyles = JSON.parse(match[0]);
             } catch (e) {}
 
-            setSessions(prev => prev.map(s => s.id === sessionId ? {
-                ...s,
-                artifacts: s.artifacts.map((art, i) => ({...art, styleName: generatedStyles[i] || art.styleName}))
-            } : s));
+            setSessions(prev => {
+                const updated = prev.map(s => s.id === sessionId ? {
+                    ...s,
+                    artifacts: s.artifacts.map((art, i) => ({...art, styleName: generatedStyles[i] || art.styleName}))
+                } : s);
+
+                if (user) {
+                    const matched = updated.find(x => x.id === sessionId);
+                    if (matched) {
+                        setDoc(doc(db, 'users', user.uid, 'sessions', sessionId), {
+                            ...matched,
+                            userId: user.uid
+                        }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/sessions/${sessionId}`));
+                    }
+                }
+                return updated;
+            });
 
             const generateArtifact = async (artifact: Artifact, styleInstruction: string) => {
                 try {
@@ -351,16 +437,43 @@ STRICT REQUIREMENTS:
                         } : sess));
                     }
 
-                    setSessions(prev => prev.map(sess => sess.id === sessionId ? {
-                        ...sess,
-                        artifacts: sess.artifacts.map(art => art.id === artifact.id ? { ...art, html: cleanHtmlString(accumulatedHtml), status: 'complete' } : art)
-                    } : sess));
+                    const finalHtml = cleanHtmlString(accumulatedHtml);
+                    setSessions(prev => {
+                        const updated = prev.map(sess => sess.id === sessionId ? {
+                            ...sess,
+                            artifacts: sess.artifacts.map(art => art.id === artifact.id ? { ...art, html: finalHtml, status: 'complete' as const } : art)
+                        } : sess);
+
+                        if (user) {
+                            const matched = updated.find(x => x.id === sessionId);
+                            if (matched) {
+                                setDoc(doc(db, 'users', user.uid, 'sessions', sessionId), {
+                                    ...matched,
+                                    userId: user.uid
+                                }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/sessions/${sessionId}`));
+                            }
+                        }
+                        return updated;
+                    });
                 } catch (e) {
                     console.error(`Artifact generation failed for ${artifact.id}:`, e);
-                    setSessions(prev => prev.map(sess => sess.id === sessionId ? {
-                        ...sess,
-                        artifacts: sess.artifacts.map(art => art.id === artifact.id ? { ...art, status: 'error' } : art)
-                    } : sess));
+                    setSessions(prev => {
+                        const updated = prev.map(sess => sess.id === sessionId ? {
+                            ...sess,
+                            artifacts: sess.artifacts.map(art => art.id === artifact.id ? { ...art, status: 'error' as const } : art)
+                        } : sess);
+
+                        if (user) {
+                            const matched = updated.find(x => x.id === sessionId);
+                            if (matched) {
+                                setDoc(doc(db, 'users', user.uid, 'sessions', sessionId), {
+                                    ...matched,
+                                    userId: user.uid
+                                }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/sessions/${sessionId}`));
+                            }
+                        }
+                        return updated;
+                    });
                 }
             };
 
@@ -371,40 +484,77 @@ STRICT REQUIREMENTS:
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [getAiClient]);
 
     const updateSessionArtifact = (sessionIndex: number, artifactIndex: number, html: string) => {
-         setSessions(prev => prev.map((sess, i) => 
-            i === sessionIndex ? {
-                ...sess,
-                artifacts: sess.artifacts.map((art, j) => 
-                  j === artifactIndex ? { ...art, html: cleanHtmlString(html), status: 'complete' } : art
-                )
-            } : sess
-        ));
+         const finalHtml = cleanHtmlString(html);
+         setSessions(prev => {
+             const updated = prev.map((sess, i) => 
+                i === sessionIndex ? {
+                    ...sess,
+                    artifacts: sess.artifacts.map((art, j) => 
+                      j === artifactIndex ? { ...art, html: finalHtml, status: 'complete' as const } : art
+                    )
+                } : sess
+             );
+
+             const user = auth.currentUser;
+             const targetSess = updated[sessionIndex];
+             if (user && targetSess) {
+                 setDoc(doc(db, 'users', user.uid, 'sessions', targetSess.id), {
+                     ...targetSess,
+                     userId: user.uid
+                 }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/sessions/${targetSess.id}`));
+             }
+             return updated;
+         });
     };
 
     const addVariationToSession = (sessionIndex: number, newArtifact: Artifact) => {
-        setSessions(prev => prev.map((sess, i) => 
-            i === sessionIndex ? {
-                ...sess,
-                artifacts: [...sess.artifacts, newArtifact]
-            } : sess
-        ));
+        setSessions(prev => {
+            const updated = prev.map((sess, i) => 
+                i === sessionIndex ? {
+                    ...sess,
+                    artifacts: [...sess.artifacts, newArtifact]
+                } : sess
+            );
+
+            const user = auth.currentUser;
+            const targetSess = updated[sessionIndex];
+            if (user && targetSess) {
+                setDoc(doc(db, 'users', user.uid, 'sessions', targetSess.id), {
+                    ...targetSess,
+                    userId: user.uid
+                }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/sessions/${targetSess.id}`));
+            }
+            return updated;
+        });
     };
 
     const updateSessionArtifactFiles = (sessionId: string, artifactId: string, files: Record<string, string>) => {
-        setSessions(prev => prev.map(sess => 
-            sess.id === sessionId ? {
-                ...sess,
-                artifacts: sess.artifacts.map(art => 
-                    art.id === artifactId ? { 
-                        ...art, 
-                        additionalFiles: { ...(art.additionalFiles || {}), ...files } 
-                    } : art
-                )
-            } : sess
-        ));
+        setSessions(prev => {
+            const updated = prev.map(sess => 
+                sess.id === sessionId ? {
+                    ...sess,
+                    artifacts: sess.artifacts.map(art => 
+                        art.id === artifactId ? { 
+                            ...art, 
+                            additionalFiles: { ...(art.additionalFiles || {}), ...files } 
+                        } : art
+                    )
+                } : sess
+            );
+
+            const user = auth.currentUser;
+            const targetSess = updated.find(s => s.id === sessionId);
+            if (user && targetSess) {
+                setDoc(doc(db, 'users', user.uid, 'sessions', sessionId), {
+                    ...targetSess,
+                    userId: user.uid
+                }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/sessions/${sessionId}`));
+            }
+            return updated;
+        });
     };
 
     const generateAdditionalFile = useCallback(async (baseHtml: string, filename: string, description: string, outputFormat?: string) => {
@@ -446,14 +596,27 @@ STRICT REQUIREMENTS:
     }, []);
 
     const toggleFavorite = useCallback((sessionId: string, artifactId: string) => {
-        setSessions(prev => prev.map(s => 
-            s.id === sessionId ? {
-                ...s,
-                artifacts: s.artifacts.map(a => 
-                    a.id === artifactId ? { ...a, isFavorite: !a.isFavorite } : a
-                )
-            } : s
-        ));
+        setSessions(prev => {
+            const updated = prev.map(s => 
+                s.id === sessionId ? {
+                    ...s,
+                    artifacts: s.artifacts.map(a => 
+                        a.id === artifactId ? { ...a, isFavorite: !a.isFavorite } : a
+                    )
+                } : s
+            );
+            const user = auth.currentUser;
+            if (user) {
+                const matched = updated.find(x => x.id === sessionId);
+                if (matched) {
+                    setDoc(doc(db, 'users', user.uid, 'sessions', sessionId), {
+                        ...matched,
+                        userId: user.uid
+                    }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/sessions/${sessionId}`));
+                }
+            }
+            return updated;
+        });
     }, []);
 
     const toggleSave = useCallback((sessionId: string, artifactId: string) => {
@@ -462,42 +625,94 @@ STRICT REQUIREMENTS:
         
         if (!artifact) return;
 
-        setSessions(prev => prev.map(s => 
-            s.id === sessionId ? {
-                ...s,
-                artifacts: s.artifacts.map(a => 
-                    a.id === artifactId ? { ...a, isSaved: !a.isSaved } : a
-                )
-            } : s
-        ));
+        setSessions(prev => {
+            const updated = prev.map(s => 
+                s.id === sessionId ? {
+                    ...s,
+                    artifacts: s.artifacts.map(a => 
+                        a.id === artifactId ? { ...a, isSaved: !a.isSaved } : a
+                    )
+                } : s
+            );
+            const user = auth.currentUser;
+            if (user) {
+                const matched = updated.find(x => x.id === sessionId);
+                if (matched) {
+                    setDoc(doc(db, 'users', user.uid, 'sessions', sessionId), {
+                        ...matched,
+                        userId: user.uid
+                    }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/sessions/${sessionId}`));
+                }
+            }
+            return updated;
+        });
 
         setSavedArtifacts(prev => {
             const exists = prev.find(a => a.id === artifactId);
+            const user = auth.currentUser;
             if (exists) {
+                if (user) {
+                    deleteDoc(doc(db, 'users', user.uid, 'savedArtifacts', artifactId))
+                        .catch(err => handleFirestoreError(err, OperationType.DELETE, `users/${user.uid}/savedArtifacts/${artifactId}`));
+                }
                 return prev.filter(a => a.id !== artifactId);
             } else {
-                return [...prev, { ...artifact, isSaved: true }];
+                const newArtifact = { ...artifact, isSaved: true };
+                if (user) {
+                    setDoc(doc(db, 'users', user.uid, 'savedArtifacts', artifactId), newArtifact)
+                        .catch(err => handleFirestoreError(err, OperationType.CREATE, `users/${user.uid}/savedArtifacts/${artifactId}`));
+                }
+                return [...prev, newArtifact];
             }
         });
     }, [sessions]);
 
     const removeSaved = useCallback((artifactId: string) => {
-        setSavedArtifacts(prev => prev.filter(a => a.id !== artifactId));
-        setSessions(prev => prev.map(s => ({
-            ...s,
-            artifacts: s.artifacts.map(a => 
-                a.id === artifactId ? { ...a, isSaved: false } : a
-            )
-        })));
+        const user = auth.currentUser;
+        setSavedArtifacts(prev => {
+            if (user) {
+                deleteDoc(doc(db, 'users', user.uid, 'savedArtifacts', artifactId))
+                    .catch(err => handleFirestoreError(err, OperationType.DELETE, `users/${user.uid}/savedArtifacts/${artifactId}`));
+            }
+            return prev.filter(a => a.id !== artifactId);
+        });
+        setSessions(prev => {
+            const updated = prev.map(s => ({
+                ...s,
+                artifacts: s.artifacts.map(a => 
+                    a.id === artifactId ? { ...a, isSaved: false } : a
+                )
+            }));
+            if (user) {
+                const sessionWithArt = updated.find(s => s.artifacts.some(a => a.id === artifactId));
+                if (sessionWithArt) {
+                    setDoc(doc(db, 'users', user.uid, 'sessions', sessionWithArt.id), {
+                        ...sessionWithArt,
+                        userId: user.uid
+                    }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/sessions/${sessionWithArt.id}`));
+                }
+            }
+            return updated;
+        });
     }, []);
 
     const resetSessions = useCallback(() => {
         setSessions([]);
         setIsLoading(false);
-        try {
-            localStorage.removeItem(STORAGE_KEY);
-        } catch (e) {
-            console.warn('Failed to clear sessions from local storage', e);
+        const user = auth.currentUser;
+        if (user) {
+            getDocs(collection(db, 'users', user.uid, 'sessions')).then((snap) => {
+                snap.forEach((docSnap) => {
+                    deleteDoc(doc(db, 'users', user.uid, 'sessions', docSnap.id))
+                        .catch(() => {});
+                });
+            }).catch(() => {});
+        } else {
+            try {
+                localStorage.removeItem(STORAGE_KEY);
+            } catch (e) {
+                console.warn('Failed to clear sessions from local storage', e);
+            }
         }
     }, []);
 
@@ -694,11 +909,26 @@ Return ONLY a JSON array of objects with the following structure:
 
         setIsLoading(true);
 
+        const user = auth.currentUser;
+
         // Update status to streaming/processing
-        setSessions(prev => prev.map(s => s.id === sessionId ? {
-            ...s,
-            artifacts: s.artifacts.map(a => a.id === artifactId ? { ...a, status: 'streaming' } : a)
-        } : s));
+        setSessions(prev => {
+            const updated = prev.map(s => s.id === sessionId ? {
+                ...s,
+                artifacts: s.artifacts.map(a => a.id === artifactId ? { ...a, status: 'streaming' as const } : a)
+            } : s);
+
+            if (user) {
+                const matched = updated.find(x => x.id === sessionId);
+                if (matched) {
+                    setDoc(doc(db, 'users', user.uid, 'sessions', sessionId), {
+                        ...matched,
+                        userId: user.uid
+                    }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/sessions/${sessionId}`));
+                }
+            }
+            return updated;
+        });
 
         try {
             let fetchedContext = '';
@@ -772,23 +1002,54 @@ STRICT REQUIREMENTS:
                 } : sess));
             }
 
-            setSessions(prev => prev.map(sess => sess.id === sessionId ? {
-                ...sess,
-                artifacts: sess.artifacts.map(art => art.id === artifactId ? { ...art, html: cleanHtmlString(accumulatedHtml), status: 'complete' } : art)
-            } : sess));
+            const finalHtml = cleanHtmlString(accumulatedHtml);
+            setSessions(prev => {
+                const updated = prev.map(sess => sess.id === sessionId ? {
+                    ...sess,
+                    artifacts: sess.artifacts.map(art => art.id === artifactId ? { ...art, html: finalHtml, status: 'complete' as const } : art)
+                } : sess);
+
+                if (user) {
+                    const matched = updated.find(x => x.id === sessionId);
+                    if (matched) {
+                        setDoc(doc(db, 'users', user.uid, 'sessions', sessionId), {
+                            ...matched,
+                            userId: user.uid
+                        }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/sessions/${sessionId}`));
+                    }
+                }
+                return updated;
+            });
 
         } catch (e) {
             console.error("Revision failed:", e);
-            setSessions(prev => prev.map(sess => sess.id === sessionId ? {
-                ...sess,
-                artifacts: sess.artifacts.map(art => art.id === artifactId ? { ...art, status: 'error' } : art)
-            } : sess));
+            setSessions(prev => {
+                const updated = prev.map(sess => sess.id === sessionId ? {
+                    ...sess,
+                    artifacts: sess.artifacts.map(art => art.id === artifactId ? { ...art, status: 'error' as const } : art)
+                } : sess);
+
+                if (user) {
+                    const matched = updated.find(x => x.id === sessionId);
+                    if (matched) {
+                        setDoc(doc(db, 'users', user.uid, 'sessions', sessionId), {
+                            ...matched,
+                            userId: user.uid
+                        }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/sessions/${sessionId}`));
+                    }
+                }
+                return updated;
+            });
         } finally {
             setIsLoading(false);
         }
     }, [getAiClient, sessions]);
 
     return {
+        currentUser,
+        authLoading,
+        loginWithGoogle,
+        logoutUser,
         sessions,
         savedArtifacts,
         userApiKey,
