@@ -12,7 +12,17 @@ import { Artifact, ComponentVariation, RecommendedPage, AnimationStyle, Template
 import { TEMPLATES } from '../templates';
 import { ANIMATION_STYLES } from '../animations';
 import { downloadCode, downloadZip, getExportedFiles, ExportedFiles } from '../utils/export';
-import { formatAsMarkdown, downloadAsMarkdown, downloadAsPlainText, downloadAsPDF, downloadAsDoc } from '../utils/exportRecommendations';
+import { 
+    formatAsMarkdown, 
+    downloadAsMarkdown, 
+    downloadAsPlainText, 
+    downloadAsPDF, 
+    downloadAsDoc,
+    downloadSuggestionsAsMarkdown,
+    downloadSuggestionsAsPlainText,
+    downloadSuggestionsAsJSON,
+    downloadSuggestionsAsPDF
+} from '../utils/exportRecommendations';
 import { deployToVercel } from '../utils/vercel';
 
 interface DrawerContentProps {
@@ -39,7 +49,7 @@ interface DrawerContentProps {
     applyAnimation?: (code: string, animationPrompt: string) => Promise<string | undefined>;
     generateAdditionalFile?: (baseHtml: string, filename: string, description: string, outputFormat?: string) => Promise<string>;
     onUpdateArtifactFiles?: (sessionId: string, artifactId: string, files: Record<string, string>) => void;
-    generateTailoredRecommendations?: (currentPrompt: string, html: string) => Promise<{ components: string[], integrations: string[], apis: string[] }>;
+    generateTailoredRecommendations?: (currentPrompt: string, html: string, techStack?: string, searchQuery?: string) => Promise<{ components: string[], integrations: string[], apis: string[] }>;
 }
 
 const FORMATS = [
@@ -154,7 +164,7 @@ export default function DrawerContent({
     const [isAnimating, setIsAnimating] = useState(false);
 
     // Dynamic Blueprint Subtab State & Lists Tracker
-    const [subTab, setSubTab] = useState<'pages' | 'components' | 'integrations' | 'apis'>('pages');
+    const [subTab, setSubTab] = useState<'pages' | 'components' | 'integrations' | 'apis' | 'grounding'>('pages');
 
     // Checked items for Injection
     const [checkedComponents, setCheckedComponents] = useState<Set<string>>(new Set());
@@ -170,6 +180,17 @@ export default function DrawerContent({
     const [customComponentInput, setCustomComponentInput] = useState('');
     const [customIntegrationInput, setCustomIntegrationInput] = useState('');
     const [customAPIInput, setCustomAPIInput] = useState('');
+
+    // Search keywords for lists
+    const [componentSearch, setComponentSearch] = useState('');
+    const [integrationSearch, setIntegrationSearch] = useState('');
+    const [apiSearch, setApiSearch] = useState('');
+
+    const [localTechStack, setLocalTechStack] = useState(() => {
+        return localStorage.getItem('flash_ui_tech_stack') || '';
+    });
+    const [showExportSuggestionsMenu, setShowExportSuggestionsMenu] = useState(false);
+    const [realtimeSearch, setRealtimeSearch] = useState('');
 
     const [isInjecting, setIsInjecting] = useState(false);
     const [injectionStatus, setInjectionStatus] = useState<string | null>(null);
@@ -457,7 +478,16 @@ export default function DrawerContent({
         "Interactive Stats Overview Bento Grid",
         "Clean User Settings Modal with Profile Forms",
         "Animated Toast Notifications",
-        "Responsive Navigation Sidebar"
+        "Responsive Navigation Sidebar",
+        "Comprehensive Analytics Dashboard Header with Datepicker",
+        "Interactive Kanban Board with Drag & Drop Stencils",
+        "Responsive Horizontal Mega-Menu Navigation bar",
+        "Beautiful Pricing Comparison Grid with Annual/Monthly Toggle",
+        "Advanced Multi-step Onboarding & Registration Form",
+        "Clean Accordion-Style Collapsible FAQ Section",
+        "Dynamic Micro-Sparkline Charts & Trend Indicators",
+        "Integrated Customer Feedback Widget with Rating Stars",
+        "Slide-over Navigation Rail with Collapsing Control"
     ];
 
     const DEFAULT_INTEGRATIONS = [
@@ -465,16 +495,94 @@ export default function DrawerContent({
         { name: "Google Drive & Google Picker", desc: "Saves generated code files directly in Drive and browses asset references." },
         { name: "Google Sheets Grounding", desc: "Integrates spreadsheets context dynamically into the UI as a database grid." },
         { name: "Google Calendar & Tasks", desc: "Saves schedules, events, or todo boards back to the user's active workspace." },
-        { name: "Gmail & Google Meet Sync", desc: "Saves drafts of generated components or triggers automated meetings with deep links." }
+        { name: "Gmail & Google Meet Sync", desc: "Saves drafts of generated components or triggers automated meetings with deep links." },
+        { name: "Supabase Database & Realtime", desc: "Connects a PostgreSQL database with real-time row-level listener subscriptions." },
+        { name: "Stripe Subscriptions & Gateways", desc: "Configures secure checkout overlays, billing portals, and recurring packages." },
+        { name: "Auth0 Single Sign-On (SSO)", desc: "Enables enterprise-grade multi-factor authentications and token handlers." },
+        { name: "OpenAI Speech & Translate TTS", desc: "Converts frontend text selectors to realistic, high-fidelity vocal speech." },
+        { name: "Algolia Lightning search index", desc: "Applies high-speed instant search query filters over large collections." },
+        { name: "Sentry Performance Monitor", desc: "Auto-reports runtime exceptions, diagnostics, and session replay analytics." },
+        { name: "Zapier Trigger Integration", desc: "Hooks up automated multi-step trigger webhooks when specific components execute." }
     ];
 
     const DEFAULT_APIS = [
-        { name: "Stripe Subscriptions", type: "Payment", desc: "Creates checkout modals and billing status pills." },
-        { name: "SendGrid SMTP Mailer", type: "Email Dispatcher", desc: "Sends custom reports or confirmation triggers." },
-        { name: "Twilio Alerts Integration", type: "SMS", desc: "Wires real-time SMS alert switches and mock messaging logs." },
-        { name: "OpenWeather Live Grounder", type: "Weather API", desc: "Injects live geographical weather forecasts." },
-        { name: "GitHub OAuth Publisher", type: "Publisher", desc: "Synchronizes generated templates straight to GitHub commits." }
+        { name: "Stripe Subscriptions API", type: "Payment Processing", desc: "Fledges out subscriptions checkout and billing status pill elements." },
+        { name: "SendGrid SMTP Mailer API", type: "Transactional Email", desc: "Automates scheduled report dispatches and verification triggers." },
+        { name: "Twilio SMS & Alert API", type: "Notifications", desc: "Triggers urgent custom text indicators, verification codes, and client messages." },
+        { name: "OpenWeather Live Forecast API", type: "Geo Feeds", desc: "Wires real-time live location weather widgets and forecast cards." },
+        { name: "GitHub Repository API", type: "Deployment", desc: "Commits files directly to a repository or raises custom pull requests." },
+        { name: "HubSpot CRM & Sync API", type: "CRM Systems", desc: "Synchronizes contact details, customer requests, and support tickets." },
+        { name: "CoinGecko Market Feed API", type: "Crypto Feed", desc: "Pulls cryptocurrency charts and exchange values." },
+        { name: "Unsplash Imagery Engine API", type: "Digital Assets", desc: "Direct searches for user avatars, mock design photos, and background banners." },
+        { name: "Resend Email Dispatcher API", type: "Communications", desc: "Next-gen API specifically tuned to dispatch clean React-based mail drafts." },
+        { name: "Google Cloud Client Translate API", type: "Localization", desc: "Translates entire text elements instantly based on client region triggers." },
+        { name: "Slack Alerts Webhook Service", type: "Collaboration", desc: "Posts structured webhook payloads straight to team communication spaces." }
     ];
+
+    // Filter computation memos
+    const filteredComponentsList = useMemo(() => {
+        const list = [...DEFAULT_RECOMMENDED_COMPONENTS, ...customComponents];
+        if (!componentSearch.trim()) return list;
+        return list.filter(item => item.toLowerCase().includes(componentSearch.toLowerCase()));
+    }, [componentSearch, customComponents]);
+
+    const filteredIntegrationsList = useMemo(() => {
+        const list = [...DEFAULT_INTEGRATIONS.map(i => i.name), ...customIntegrations];
+        if (!integrationSearch.trim()) return list;
+        return list.filter(item => item.toLowerCase().includes(integrationSearch.toLowerCase()));
+    }, [integrationSearch, customIntegrations]);
+
+    const filteredAPIsList = useMemo(() => {
+        const list = [...DEFAULT_APIS.map(a => a.name), ...customAPIs];
+        if (!apiSearch.trim()) return list;
+        return list.filter(item => item.toLowerCase().includes(apiSearch.toLowerCase()));
+    }, [apiSearch, customAPIs]);
+
+    // Check all / Uncheck all toggle actions for filtered items
+    const toggleSelectAllComponents = () => {
+        const allChecked = filteredComponentsList.every(comp => checkedComponents.has(comp));
+        setCheckedComponents(curr => {
+            const next = new Set(curr);
+            filteredComponentsList.forEach(comp => {
+                if (allChecked) {
+                    next.delete(comp);
+                } else {
+                    next.add(comp);
+                }
+            });
+            return next;
+        });
+    };
+
+    const toggleSelectAllIntegrations = () => {
+        const allChecked = filteredIntegrationsList.every(item => checkedIntegrations.has(item));
+        setCheckedIntegrations(curr => {
+            const next = new Set(curr);
+            filteredIntegrationsList.forEach(item => {
+                if (allChecked) {
+                    next.delete(item);
+                } else {
+                    next.add(item);
+                }
+            });
+            return next;
+        });
+    };
+
+    const toggleSelectAllAPIs = () => {
+        const allChecked = filteredAPIsList.every(item => checkedAPIs.has(item));
+        setCheckedAPIs(curr => {
+            const next = new Set(curr);
+            filteredAPIsList.forEach(item => {
+                if (allChecked) {
+                    next.delete(item);
+                } else {
+                    next.add(item);
+                }
+            });
+            return next;
+        });
+    };
 
     const handleInjectSelectedBlueprints = async () => {
         if (!refactorCode || !data?.html) return;
@@ -482,16 +590,13 @@ export default function DrawerContent({
         setInjectionStatus("Analyzing code layout & synthesizing selected components...");
 
         const componentsToIncorporate = [
-            ...Array.from(checkedComponents),
-            ...customComponents
+            ...Array.from(checkedComponents)
         ];
         const integrationsToIncorporate = [
-            ...DEFAULT_INTEGRATIONS.filter(item => checkedIntegrations.has(item.name)).map(item => `${item.name}: ${item.desc}`),
-            ...customIntegrations
+            ...[...DEFAULT_INTEGRATIONS, ...customIntegrations.map(name => ({ name, desc: "Custom added AI integration requirement." }))].filter(item => checkedIntegrations.has(item.name)).map(item => `${item.name}: ${item.desc}`)
         ];
         const apisToIncorporate = [
-            ...DEFAULT_APIS.filter(item => checkedAPIs.has(item.name)).map(item => `${item.name} (${item.type}): ${item.desc}`),
-            ...customAPIs
+            ...[...DEFAULT_APIS, ...customAPIs.map(name => ({ name, type: "Integration", desc: "Custom added API routing." }))].filter(item => checkedAPIs.has(item.name)).map(item => `${item.name} (${(item as any).type || 'Custom'}): ${item.desc}`)
         ];
 
         if (componentsToIncorporate.length === 0 && integrationsToIncorporate.length === 0 && apisToIncorporate.length === 0) {
@@ -531,18 +636,28 @@ INSTRUCTIONS:
         }
     };
 
-    const handleAITailorRecommendations = async () => {
+    const handleAITailorRecommendations = async (overrideSearchQuery?: string) => {
         if (!data?.html || !generateTailoredRecommendations || !data?.prompt) {
             alert("Ensure your draft holds prompts before tailoring recommendations.");
             return;
         }
         setIsTailoring(true);
-        setInjectionStatus("AI is analyzing active prototype context...");
+        if (overrideSearchQuery) {
+            setInjectionStatus(`Querying real-time AI context for "${overrideSearchQuery}"...`);
+        } else {
+            setInjectionStatus("AI is analyzing active prototype context...");
+        }
         try {
-            const parsed = await generateTailoredRecommendations(data.prompt, data.html);
+            const parsed = await generateTailoredRecommendations(data.prompt, data.html, localTechStack, overrideSearchQuery);
             
             if (parsed.components && parsed.components.length > 0) {
-                setCustomComponents(prev => [...prev, ...parsed.components]);
+                setCustomComponents(prev => {
+                    const nextList = [...prev];
+                    parsed.components.forEach((c: string) => {
+                        if (!nextList.includes(c)) nextList.push(c);
+                    });
+                    return nextList;
+                });
                 parsed.components.forEach((c: string) => setCheckedComponents(curr => {
                     const next = new Set(curr);
                     next.add(c);
@@ -550,7 +665,13 @@ INSTRUCTIONS:
                 }));
             }
             if (parsed.integrations && parsed.integrations.length > 0) {
-                setCustomIntegrations(prev => [...prev, ...parsed.integrations]);
+                setCustomIntegrations(prev => {
+                    const nextList = [...prev];
+                    parsed.integrations.forEach((i: string) => {
+                        if (!nextList.includes(i)) nextList.push(i);
+                    });
+                    return nextList;
+                });
                 parsed.integrations.forEach((i: string) => setCheckedIntegrations(curr => {
                     const next = new Set(curr);
                     next.add(i);
@@ -558,14 +679,20 @@ INSTRUCTIONS:
                 }));
             }
             if (parsed.apis && parsed.apis.length > 0) {
-                setCustomAPIs(prev => [...prev, ...parsed.apis]);
+                setCustomAPIs(prev => {
+                    const nextList = [...prev];
+                    parsed.apis.forEach((a: string) => {
+                        if (!nextList.includes(a)) nextList.push(a);
+                    });
+                    return nextList;
+                });
                 parsed.apis.forEach((a: string) => setCheckedAPIs(curr => {
                     const next = new Set(curr);
                     next.add(a);
                     return next;
                 }));
             }
-            setInjectionStatus("Custom suggestions tailored & auto-checked!");
+            setInjectionStatus(overrideSearchQuery ? "Live options grounded successfully!" : "Custom suggestions tailored & auto-checked!");
             setTimeout(() => setInjectionStatus(null), 3500);
         } catch (e) {
             console.error(e);
@@ -574,6 +701,85 @@ INSTRUCTIONS:
         } finally {
             setIsTailoring(false);
         }
+    };
+
+    const handleExportSuggestions = (format: 'md' | 'txt' | 'json' | 'pdf') => {
+        const DEFAULT_RECOMMENDED_COMPONENTS = [
+            "Interactive Stats Overview Bento Grid",
+            "Clean User Settings Modal with Profile Forms",
+            "Animated Toast Notifications",
+            "Responsive Navigation Sidebar",
+            "Comprehensive Analytics Dashboard Header with Datepicker",
+            "Interactive Kanban Board with Drag & Drop Stencils",
+            "Responsive Horizontal Mega-Menu Navigation bar",
+            "Beautiful Pricing Comparison Grid with Annual/Monthly Toggle",
+            "Advanced Multi-step Onboarding & Registration Form",
+            "Clean Accordion-Style Collapsible FAQ Section",
+            "Dynamic Micro-Sparkline Charts & Trend Indicators",
+            "Integrated Customer Feedback Widget with Rating Stars",
+            "Slide-over Navigation Rail with Collapsing Control"
+        ];
+    
+        const DEFAULT_INTEGRATIONS = [
+            { name: "Google Drive & Google Picker", desc: "Saves generated code files directly in Drive and browses asset references." },
+            { name: "Google Sheets Grounding", desc: "Integrates spreadsheets context dynamically into the UI as a database grid." },
+            { name: "Google Calendar & Tasks", desc: "Saves schedules, events, or todo boards back to the user's active workspace." },
+            { name: "Gmail & Google Meet Sync", desc: "Saves drafts of generated components or triggers automated meetings with deep links." },
+            { name: "Supabase Database & Realtime", desc: "Connects a PostgreSQL database with real-time row-level listener subscriptions." },
+            { name: "Stripe Subscriptions & Gateways", desc: "Configures secure checkout overlays, billing portals, and recurring packages." },
+            { name: "Auth0 Single Sign-On (SSO)", desc: "Enables enterprise-grade multi-factor authentications and token handlers." },
+            { name: "OpenAI Speech & Translate TTS", desc: "Converts frontend text selectors to realistic, high-fidelity vocal speech." },
+            { name: "Algolia Lightning search index", desc: "Applies high-speed instant search query filters over large collections." },
+            { name: "Sentry Performance Monitor", desc: "Auto-reports runtime exceptions, diagnostics, and session replay analytics." },
+            { name: "Zapier Trigger Integration", desc: "Hooks up automated multi-step trigger webhooks when specific components execute." }
+        ];
+    
+        const DEFAULT_APIS = [
+            { name: "Stripe Subscriptions API", type: "Payment Processing", desc: "Fledges out subscriptions checkout and billing status pill elements." },
+            { name: "SendGrid SMTP Mailer API", type: "Transactional Email", desc: "Automates scheduled report dispatches and verification triggers." },
+            { name: "Twilio SMS & Alert API", type: "Notifications", desc: "Triggers urgent custom text indicators, verification codes, and client messages." },
+            { name: "OpenWeather Live Forecast API", type: "Geo Feeds", desc: "Wires real-time live location weather widgets and forecast cards." },
+            { name: "GitHub Repository API", type: "Deployment", desc: "Commits files directly to a repository or raises custom pull requests." },
+            { name: "HubSpot CRM & Sync API", type: "CRM Systems", desc: "Synchronizes contact details, customer requests, and support tickets." },
+            { name: "CoinGecko Market Feed API", type: "Crypto Feed", desc: "Pulls cryptocurrency charts and exchange values." },
+            { name: "Unsplash Imagery Engine API", type: "Digital Assets", desc: "Direct searches for user avatars, mock design photos, and background banners." },
+            { name: "Resend Email Dispatcher API", type: "Communications", desc: "Next-gen API specifically tuned to dispatch clean React-based mail drafts." },
+            { name: "Google Cloud Client Translate API", type: "Localization", desc: "Translates entire text elements instantly based on client region triggers." },
+            { name: "Slack Alerts Webhook Service", type: "Collaboration", desc: "Posts structured webhook payloads straight to team communication spaces." }
+        ];
+
+        const components = [...DEFAULT_RECOMMENDED_COMPONENTS, ...customComponents];
+        const integrations = [
+            ...DEFAULT_INTEGRATIONS, 
+            ...customIntegrations.map(name => ({ name, desc: "Custom added AI integration requirement." }))
+        ];
+        const apis = [
+            ...DEFAULT_APIS, 
+            ...customAPIs.map(name => ({ name, type: "Integration", desc: "Custom added API routing." }))
+        ];
+
+        const dataExport = {
+            components,
+            checkedComponents,
+            integrations,
+            checkedIntegrations,
+            apis,
+            checkedAPIs,
+            techStack: localTechStack
+        };
+
+        if (format === 'md') {
+            downloadSuggestionsAsMarkdown(dataExport);
+        } else if (format === 'txt') {
+            downloadSuggestionsAsPlainText(dataExport);
+        } else if (format === 'json') {
+            downloadSuggestionsAsJSON(dataExport);
+        } else if (format === 'pdf') {
+            downloadSuggestionsAsPDF(dataExport);
+        }
+        setShowExportSuggestionsMenu(false);
+        setExportFeedback("Exported successfully!");
+        setTimeout(() => setExportFeedback(null), 2500);
     };
 
     const handleCopyFile = () => {
@@ -957,7 +1163,7 @@ INSTRUCTIONS:
                     <div className="recommended-actions-bar">
                         <div className="section-title">Architect Blueprint</div>
                         <div className="blueprint-actions">
-                            {subTab === 'pages' && (
+                            {subTab === 'pages' ? (
                                 <>
                                     <button 
                                         className="blueprint-btn copy-btn"
@@ -983,10 +1189,28 @@ INSTRUCTIONS:
                                         )}
                                     </div>
                                 </>
+                            ) : (
+                                <div className="export-menu-container">
+                                    <button 
+                                        className="blueprint-btn export-btn"
+                                        onClick={() => setShowExportSuggestionsMenu(!showExportSuggestionsMenu)}
+                                        title="Export suggestions to PDF, Markdown, Text, JSON..."
+                                    >
+                                        <DownloadIcon /> Export Suggestions <ChevronDownIcon />
+                                    </button>
+                                    {showExportSuggestionsMenu && (
+                                        <div className="export-dropdown">
+                                            <button onClick={() => handleExportSuggestions('md')}>Markdown (.md)</button>
+                                            <button onClick={() => handleExportSuggestions('txt')}>Plain Text (.txt)</button>
+                                            <button onClick={() => handleExportSuggestions('json')}>JSON (.json)</button>
+                                            <button onClick={() => handleExportSuggestions('pdf')}>PDF Report</button>
+                                        </div>
+                                    )}
+                                </div>
                             )}
                             <button 
                                 className="blueprint-btn ai-tailor-btn"
-                                onClick={handleAITailorRecommendations}
+                                onClick={() => handleAITailorRecommendations()}
                                 disabled={isTailoring || isInjecting}
                                 title="AI Auto-suggest tailored components & APIs"
                             >
@@ -1019,6 +1243,14 @@ INSTRUCTIONS:
                             onClick={() => setSubTab('apis')}
                         >
                             🔌 Actions & APIs
+                        </button>
+                        <button 
+                            className={`blueprint-tab ${subTab === 'grounding' ? 'active' : ''}`}
+                            onClick={() => setSubTab('grounding')}
+                            style={{ position: 'relative' }}
+                        >
+                            🎯 Grounding Hub
+                            <span className="live-pulse-badge">Live</span>
                         </button>
                     </div>
 
@@ -1094,10 +1326,11 @@ INSTRUCTIONS:
                                     className="custom-input-box"
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter' && customComponentInput.trim()) {
-                                            setCustomComponents(prev => [...prev, customComponentInput.trim()]);
+                                            const val = customComponentInput.trim();
+                                            setCustomComponents(prev => [...prev, val]);
                                             setCheckedComponents(curr => {
                                                 const next = new Set(curr);
-                                                next.add(customComponentInput.trim());
+                                                next.add(val);
                                                 return next;
                                             });
                                             setCustomComponentInput('');
@@ -1106,10 +1339,11 @@ INSTRUCTIONS:
                                 />
                                 <button className="add-custom-btn" onClick={() => {
                                     if (customComponentInput.trim()) {
-                                        setCustomComponents(prev => [...prev, customComponentInput.trim()]);
+                                        const val = customComponentInput.trim();
+                                        setCustomComponents(prev => [...prev, val]);
                                         setCheckedComponents(curr => {
                                             const next = new Set(curr);
-                                            next.add(customComponentInput.trim());
+                                            next.add(val);
                                             return next;
                                         });
                                         setCustomComponentInput('');
@@ -1117,8 +1351,30 @@ INSTRUCTIONS:
                                 }}>Add</button>
                             </div>
 
+                            {/* Search Filter input */}
+                            <div className="checklist-search-wrapper">
+                                <input 
+                                    type="text" 
+                                    className="checklist-search-input" 
+                                    placeholder="Filter components below..." 
+                                    value={componentSearch}
+                                    onChange={(e) => setComponentSearch(e.target.value)}
+                                />
+                                <span className="checklist-search-icon">🔍</span>
+                            </div>
+
+                            {/* Selection actions & counter */}
+                            <div className="checklist-utils-row">
+                                <button className="util-link-btn" onClick={toggleSelectAllComponents}>
+                                    {filteredComponentsList.every(c => checkedComponents.has(c)) ? "Uncheck All Filtered" : "Check All Filtered"}
+                                </button>
+                                <span className="filter-count-badge">
+                                    {filteredComponentsList.filter(c => checkedComponents.has(c)).length} of {filteredComponentsList.length} selected
+                                </span>
+                            </div>
+
                             <div className="curated-checklist">
-                                {[...DEFAULT_RECOMMENDED_COMPONENTS, ...customComponents].map((comp, idx) => {
+                                {filteredComponentsList.map((comp, idx) => {
                                     const isChecked = checkedComponents.has(comp);
                                     return (
                                         <label key={idx} className={`checklist-item ${isChecked ? 'checked' : ''}`}>
@@ -1138,6 +1394,11 @@ INSTRUCTIONS:
                                         </label>
                                     );
                                 })}
+                                {filteredComponentsList.length === 0 && (
+                                    <div className="no-results" style={{padding: '12px 6px', fontSize: '0.8rem', opacity: 0.6}}>
+                                        No matching components. Press "Add" to create one.
+                                    </div>
+                                )}
                             </div>
 
                             <button 
@@ -1163,10 +1424,11 @@ INSTRUCTIONS:
                                     onChange={(e) => setCustomIntegrationInput(e.target.value)}
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter' && customIntegrationInput.trim()) {
-                                            setCustomIntegrations(prev => [...prev, customIntegrationInput.trim()]);
+                                            const val = customIntegrationInput.trim();
+                                            setCustomIntegrations(prev => [...prev, val]);
                                             setCheckedIntegrations(curr => {
                                                 const next = new Set(curr);
-                                                next.add(customIntegrationInput.trim());
+                                                next.add(val);
                                                 return next;
                                             });
                                             setCustomIntegrationInput('');
@@ -1175,10 +1437,11 @@ INSTRUCTIONS:
                                 />
                                 <button className="add-custom-btn" onClick={() => {
                                     if (customIntegrationInput.trim()) {
-                                        setCustomIntegrations(prev => [...prev, customIntegrationInput.trim()]);
+                                        const val = customIntegrationInput.trim();
+                                        setCustomIntegrations(prev => [...prev, val]);
                                         setCheckedIntegrations(curr => {
                                             const next = new Set(curr);
-                                            next.add(customIntegrationInput.trim());
+                                            next.add(val);
                                             return next;
                                         });
                                         setCustomIntegrationInput('');
@@ -1186,8 +1449,30 @@ INSTRUCTIONS:
                                 }}>Add</button>
                             </div>
 
+                            {/* Search Filter input */}
+                            <div className="checklist-search-wrapper">
+                                <input 
+                                    type="text" 
+                                    className="checklist-search-input" 
+                                    placeholder="Filter integrations below..." 
+                                    value={integrationSearch}
+                                    onChange={(e) => setIntegrationSearch(e.target.value)}
+                                />
+                                <span className="checklist-search-icon">🔍</span>
+                            </div>
+
+                            {/* Selection actions & counter */}
+                            <div className="checklist-utils-row">
+                                <button className="util-link-btn" onClick={toggleSelectAllIntegrations}>
+                                    {filteredIntegrationsList.every(i => checkedIntegrations.has(i)) ? "Uncheck All Filtered" : "Check All Filtered"}
+                                </button>
+                                <span className="filter-count-badge">
+                                    {filteredIntegrationsList.filter(i => checkedIntegrations.has(i)).length} of {filteredIntegrationsList.length} selected
+                                </span>
+                            </div>
+
                             <div className="curated-checklist">
-                                {[...DEFAULT_INTEGRATIONS.map(i => i.name), ...customIntegrations].map((item, idx) => {
+                                {filteredIntegrationsList.map((item, idx) => {
                                     const isChecked = checkedIntegrations.has(item);
                                     const desc = DEFAULT_INTEGRATIONS.find(i => i.name === item)?.desc || "Custom added AI integration requirement.";
                                     return (
@@ -1213,6 +1498,11 @@ INSTRUCTIONS:
                                         </label>
                                     );
                                 })}
+                                {filteredIntegrationsList.length === 0 && (
+                                    <div className="no-results" style={{padding: '12px 6px', fontSize: '0.8rem', opacity: 0.6}}>
+                                        No matching integrations. Press "Add" to create one.
+                                    </div>
+                                )}
                             </div>
 
                             <button 
@@ -1238,10 +1528,11 @@ INSTRUCTIONS:
                                     onChange={(e) => setCustomAPIInput(e.target.value)}
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter' && customAPIInput.trim()) {
-                                            setCustomAPIs(prev => [...prev, customAPIInput.trim()]);
+                                            const val = customAPIInput.trim();
+                                            setCustomAPIs(prev => [...prev, val]);
                                             setCheckedAPIs(curr => {
                                                 const next = new Set(curr);
-                                                next.add(customAPIInput.trim());
+                                                next.add(val);
                                                 return next;
                                             });
                                             setCustomAPIInput('');
@@ -1250,10 +1541,11 @@ INSTRUCTIONS:
                                 />
                                 <button className="add-custom-btn" onClick={() => {
                                     if (customAPIInput.trim()) {
-                                        setCustomAPIs(prev => [...prev, customAPIInput.trim()]);
+                                        const val = customAPIInput.trim();
+                                        setCustomAPIs(prev => [...prev, val]);
                                         setCheckedAPIs(curr => {
                                             const next = new Set(curr);
-                                            next.add(customAPIInput.trim());
+                                            next.add(val);
                                             return next;
                                         });
                                         setCustomAPIInput('');
@@ -1261,8 +1553,30 @@ INSTRUCTIONS:
                                 }}>Add</button>
                             </div>
 
+                            {/* Search Filter input */}
+                            <div className="checklist-search-wrapper">
+                                <input 
+                                    type="text" 
+                                    className="checklist-search-input" 
+                                    placeholder="Filter APIs/Webhooks below..." 
+                                    value={apiSearch}
+                                    onChange={(e) => setApiSearch(e.target.value)}
+                                />
+                                <span className="checklist-search-icon">🔍</span>
+                            </div>
+
+                            {/* Selection actions & counter */}
+                            <div className="checklist-utils-row">
+                                <button className="util-link-btn" onClick={toggleSelectAllAPIs}>
+                                    {filteredAPIsList.every(a => checkedAPIs.has(a)) ? "Uncheck All Filtered" : "Check All Filtered"}
+                                </button>
+                                <span className="filter-count-badge">
+                                    {filteredAPIsList.filter(a => checkedAPIs.has(a)).length} of {filteredAPIsList.length} selected
+                                </span>
+                            </div>
+
                             <div className="curated-checklist">
-                                {[...DEFAULT_APIS.map(a => a.name), ...customAPIs].map((item, idx) => {
+                                {filteredAPIsList.map((item, idx) => {
                                     const isChecked = checkedAPIs.has(item);
                                     const apiObj = DEFAULT_APIS.find(a => a.name === item);
                                     const desc = apiObj ? `${apiObj.type} • ${apiObj.desc}` : "Custom added API / Webhook trigger routing.";
@@ -1289,6 +1603,11 @@ INSTRUCTIONS:
                                         </label>
                                     );
                                 })}
+                                {filteredAPIsList.length === 0 && (
+                                    <div className="no-results" style={{padding: '12px 6px', fontSize: '0.8rem', opacity: 0.6}}>
+                                        No matching APIs. Press "Add" to create one.
+                                    </div>
+                                )}
                             </div>
 
                             <button 
@@ -1298,6 +1617,162 @@ INSTRUCTIONS:
                             >
                                 {isInjecting ? <ThinkingIcon /> : '⚡ Inject Selected Actions & Webhooks'}
                             </button>
+                        </div>
+                    )}
+
+                    {subTab === 'grounding' && (
+                        <div className="sub-components-panel grounding-hub-panel">
+                            <p className="tab-instructions">
+                                Connect your exact local apps / tools stack and trigger Google Search grounded queries to fetch and automatically inject the latest real-time libraries, elements, and configurations into your suggestions.
+                            </p>
+
+                            {/* Tech Stack Input Section */}
+                            <div className="grounding-section">
+                                <div className="grounding-section-title">
+                                    🔌 Tech Stack & Local App Environment
+                                </div>
+                                <div className="tech-stack-input-wrapper" style={{ marginTop: '8px' }}>
+                                    <label className="grounding-label-helper">My Active Tech Stack & Tools:</label>
+                                    <input 
+                                        type="text" 
+                                        placeholder="Enter tools, e.g. React, Supabase, Tailwind, Stripe, Resend..."
+                                        value={localTechStack}
+                                        onChange={(e) => {
+                                            setLocalTechStack(e.target.value);
+                                            localStorage.setItem('flash_ui_tech_stack', e.target.value);
+                                        }}
+                                        className="tech-stack-input-box"
+                                        style={{ width: '100%', marginBottom: '10px' }}
+                                    />
+                                </div>
+
+                                <div className="pills-helper-text">
+                                    Click any of these popular tools to instantly toggle/add them to your stack context:
+                                </div>
+                                <div className="tech-stack-pills">
+                                    {['React', 'Vite', 'Supabase', 'Stripe', 'Tailwind', 'Clerk', 'Framer Motion', 'Resend', 'Prisma', 'PostgreSQL', 'MongoDB', 'Redis', 'Lucide Icons', 'Recharts'].map((tool) => {
+                                        const toolsList = localTechStack.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+                                        const isActive = toolsList.includes(tool.toLowerCase());
+                                        return (
+                                            <button 
+                                                key={tool}
+                                                className={`tech-stack-pill ${isActive ? 'active' : ''}`}
+                                                onClick={() => {
+                                                    let nextStack = localTechStack.split(',').map(s => s.trim()).filter(Boolean);
+                                                    if (isActive) {
+                                                        nextStack = nextStack.filter(s => s.toLowerCase() !== tool.toLowerCase());
+                                                    } else {
+                                                        nextStack.push(tool);
+                                                    }
+                                                    const val = nextStack.join(', ');
+                                                    setLocalTechStack(val);
+                                                    localStorage.setItem('flash_ui_tech_stack', val);
+                                                }}
+                                            >
+                                                {isActive ? '✓ ' : '+ '} {tool}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* Live Query Grounding Section */}
+                            <div className="grounding-section" style={{ marginTop: '20px' }}>
+                                <div className="grounding-section-title">
+                                    🔍 Live Web & Real-Time AI Search Query
+                                </div>
+                                <p className="grounding-subtitle-helper">
+                                    Enter a targeted concept. Gemini will query the live web with Google Search Grounding to construct bespoke, integration-accurate elements for your project.
+                                </p>
+                                <div className="realtime-search-container" style={{ marginTop: '10px' }}>
+                                    <div className="realtime-search-field">
+                                        <input 
+                                            type="text" 
+                                            placeholder="Type key term, e.g., 'Stripe payment flow', 'Supabase realtime chat', 'Kanban Board'..."
+                                            value={realtimeSearch}
+                                            onChange={(e) => setRealtimeSearch(e.target.value)}
+                                            className="realtime-search-input-box"
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' && realtimeSearch.trim()) {
+                                                    handleAITailorRecommendations(realtimeSearch);
+                                                }
+                                            }}
+                                        />
+                                        <button 
+                                            onClick={() => {
+                                                if (realtimeSearch.trim()) {
+                                                    handleAITailorRecommendations(realtimeSearch);
+                                                }
+                                            }}
+                                            disabled={isTailoring || !realtimeSearch.trim()}
+                                            className="realtime-ground-btn"
+                                            title="Trigger live grounding query"
+                                            style={{ padding: '0 20px', minHeight: '42px' }}
+                                        >
+                                            {isTailoring ? <ThinkingIcon /> : "Ground Live"}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="pills-helper-text" style={{ marginTop: '14px' }}>
+                                    Popular Grounded Queries (Click to instantly search):
+                                </div>
+                                <div className="recommended-queries-grid">
+                                    {[
+                                        { label: '💳 Stripe Checkout Overlay', query: 'Stripe premium billing portal checkout form' },
+                                        { label: '💬 Realtime Supabase Chat', query: 'Supabase realtime chat socket channel' },
+                                        { label: '📊 Recharts Stats Dashboard', query: 'Recharts visual analytic dashboards interactive grid' },
+                                        { label: '🔒 Clerk Authentication', query: 'Clerk enterprise authentication user management form' },
+                                        { label: '📥 Resend Email Forms', query: 'Resend API transactional mail dispatcher' },
+                                        { label: '🧱 Interactive Kanban Drag-n-Drop', query: 'Kanban board complete stencils with active drag events' }
+                                    ].map((rq, idx) => (
+                                        <button 
+                                            key={idx}
+                                            className="recommended-query-button"
+                                            onClick={() => {
+                                                setRealtimeSearch(rq.query);
+                                                handleAITailorRecommendations(rq.query);
+                                            }}
+                                            disabled={isTailoring}
+                                        >
+                                            <span style={{ marginRight: '6px' }}>⚡</span>
+                                            {rq.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Overview / Feedback State */}
+                            <div className="grounding-recap-section">
+                                <div className="recap-header">🎯 Suggestions Overview & Recap</div>
+                                <div className="recap-stats-row">
+                                    <div className="recap-stat-card">
+                                        <span className="stat-num">{customComponents.length + 13}</span>
+                                        <span className="stat-lbl">Components Available</span>
+                                    </div>
+                                    <div className="recap-stat-card">
+                                        <span className="stat-num">{customIntegrations.length + 11}</span>
+                                        <span className="stat-lbl">AI Integrations Available</span>
+                                    </div>
+                                    <div className="recap-stat-card">
+                                        <span className="stat-num">{customAPIs.length + 11}</span>
+                                        <span className="stat-lbl">Actions & APIs Available</span>
+                                    </div>
+                                </div>
+
+                                <div className="selection-recap-summary">
+                                    <strong>Selected for injection:</strong> {checkedComponents.size} components, {checkedIntegrations.size} integrations, {checkedAPIs.size} APIs.
+                                </div>
+
+                                <button 
+                                    className="inject-blueprints-btn pulsing"
+                                    onClick={handleInjectSelectedBlueprints}
+                                    disabled={isInjecting || isTailoring}
+                                    style={{ marginTop: '16px' }}
+                                >
+                                    {isInjecting ? <ThinkingIcon /> : '⚡ Inject All Selected Requirements'}
+                                </button>
+                            </div>
                         </div>
                     )}
                 </div>

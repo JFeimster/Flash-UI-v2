@@ -13,6 +13,32 @@ const STORAGE_KEY = 'flash_ui_sessions_v1';
 const SAVED_KEY = 'flash_ui_saved_v1';
 const API_KEY_STORAGE_KEY = 'flash_ui_user_api_key';
 
+const decodeBase64ToText = (base64: string): string => {
+    try {
+        return decodeURIComponent(
+            window.atob(base64)
+                .split('')
+                .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+                .join('')
+        );
+    } catch (e) {
+        try {
+            return window.atob(base64);
+        } catch {
+            return '[Binary / Undecodable Content]';
+        }
+    }
+};
+
+const shouldSendAsText = (mimeType: string, filename: string): boolean => {
+    const m = mimeType ? mimeType.toLowerCase() : '';
+    const name = filename ? filename.toLowerCase() : '';
+    if (m.startsWith('text/')) return true;
+    if (m === 'application/json' || m === 'application/javascript' || m === 'application/typescript' || m === 'application/x-javascript') return true;
+    const textExtensions = ['.html', '.css', '.js', '.ts', '.tsx', '.json', '.csv', '.md', '.txt', '.svg', '.xml', '.yaml', '.yml', '.ini', '.conf'];
+    return textExtensions.some(ext => name.endsWith(ext));
+};
+
 export const useGenAI = () => {
     // Initialize state from localStorage
     const [userApiKey, setUserApiKey] = useState<string>(() => {
@@ -284,14 +310,20 @@ STRICT REQUIREMENTS:
                     
                     const parts: any[] = [{ text: prompt }];
                     
-                    // Add all attachments as inlineData parts
+                    // Route attachments either as inlineData (multimodal) or text blocks (source files)
                     attachments.forEach(att => {
-                        parts.push({
-                            inlineData: {
-                                mimeType: att.mimeType,
-                                data: att.data
-                            }
-                        });
+                        if (shouldSendAsText(att.mimeType, att.name)) {
+                            parts.push({
+                                text: `=== FILE ATTACHMENT: ${att.name} (${att.mimeType}) ===\n${decodeBase64ToText(att.data)}\n=== END FILE ATTACHMENT ===`
+                            });
+                        } else {
+                            parts.push({
+                                inlineData: {
+                                    mimeType: att.mimeType,
+                                    data: att.data
+                                }
+                            });
+                        }
                     });
 
                     // Wrap stream connection with retry logic
@@ -563,26 +595,43 @@ Return ONLY the complete updated raw HTML/CSS. No Markdown, no explanations.\n\n
         }
     }, []);
 
-    const generateTailoredRecommendations = useCallback(async (currentPrompt: string, html: string) => {
+    const generateTailoredRecommendations = useCallback(async (currentPrompt: string, html: string, techStack?: string, searchQuery?: string) => {
         try {
             const ai = getAiClient();
-            const prompt = `Analyze this UI component design: "${currentPrompt}" with code "${html.substring(0, 1500)}...".
-Suggest:
-1. Three customized components or layout modes specifically matching this project that should be added/built.
+            let prompt = `Analyze this UI component design: "${currentPrompt}" with code "${html.substring(0, 1500)}...".\n\n`;
+            
+            if (techStack) {
+                prompt += `CRITICAL TECH STACK & INTEGRATION CONTEXT:\nThe project utilizes the following tech stack, tools, and existing apps: "${techStack}". Make sure EVERY suggestion matches and integrates easily into this exact tech environment.\n\n`;
+            }
+            
+            if (searchQuery) {
+                prompt += `REAL-TIME LIVE SELECTION SEARCH / CRITERIA MATCH WITH GOOGLE SEARCH GROUNDING:\nThe user is specifically searching for or wanting recommendations related to: "${searchQuery}". Ensure standard suggestions are heavily focused, enriched, and grounded around this search criteria with easy-to-integrate options. Use your real-time search capabilities to locate up-to-date SDK packages, API endpoints, or npm dependencies and represent them accurately.\n\n`;
+            }
+            
+            prompt += `Suggest:
+1. Three customized UI components, modes, or design layout ideas specifically matching this project context.
 2. Two custom AI features/integrations.
-3. Two specific REST API triggers or webhooks.
+3. Two specific REST API triggers, services, or webhooks.
 
-Return ONLY a JSON object of arrays:
+Return ONLY a JSON object with this exact schema:
 {
-  "components": ["...", "...", "..."],
-  "integrations": ["...", "..."],
-  "apis": ["...", "..."]
+  "components": ["Component Name with brief feature title", "another...", "another..."],
+  "integrations": ["AI Integration Title: short description of capability", "another..."],
+  "apis": ["Endpoint Trigger: short description of action", "another..."]
 }`;
             
+            const config: any = {
+                responseMimeType: 'application/json'
+            };
+
+            if (searchQuery) {
+                config.tools = [{ googleSearch: {} }];
+            }
+
             const result = await withRetry(() => ai.models.generateContent({
                 model: 'gemini-3.5-flash',
                 contents: [{ parts: [{ text: prompt }], role: 'user' }],
-                config: { responseMimeType: 'application/json' }
+                config
             })) as GenerateContentResponse;
 
             const parsed = JSON.parse(result.text || '{}');
@@ -591,7 +640,7 @@ Return ONLY a JSON object of arrays:
             console.error("Error generating tailored recommendations:", e);
             return { components: [], integrations: [], apis: [] };
         }
-    }, [sessions]);
+    }, [getAiClient]);
 
     const suggestComponents = useCallback(async (currentPrompt: string) => {
         try {
@@ -685,12 +734,18 @@ STRICT REQUIREMENTS:
 
             const parts: any[] = [{ text: prompt }];
             attachments.forEach(att => {
-                parts.push({
-                    inlineData: {
-                        mimeType: att.mimeType,
-                        data: att.data
-                    }
-                });
+                if (shouldSendAsText(att.mimeType, att.name)) {
+                    parts.push({
+                        text: `=== FILE ATTACHMENT: ${att.name} (${att.mimeType}) ===\n${decodeBase64ToText(att.data)}\n=== END FILE ATTACHMENT ===`
+                    });
+                } else {
+                    parts.push({
+                        inlineData: {
+                            mimeType: att.mimeType,
+                            data: att.data
+                        }
+                    });
+                }
             });
 
             const responseStream = await withRetry(() => ai.models.generateContentStream({

@@ -76,6 +76,7 @@ import {
 } from './components/Icons';
 
 import FeaturesList from './components/FeaturesList';
+import SemanticRouter from './components/SemanticRouter';
 
 export const AttachmentIcon = () => (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -138,6 +139,7 @@ function App() {
   const [isPromptCollapsed, setIsPromptCollapsed] = useState(false);
   const [isImmersiveModalOpen, setIsImmersiveModalOpen] = useState(false);
   const [popoutWidth, setPopoutWidth] = useState<'100%' | '768px' | '375px'>('100%');
+  const [isRouterActive, setIsRouterActive] = useState(false);
 
   const prevSessionsLength = useRef(sessions.length);
   useEffect(() => {
@@ -340,38 +342,72 @@ function App() {
         </a>
 
         <div className="nav-menu">
-            <button 
-                className="nav-btn"
-                onClick={() => setShowFeatures(true)}
-                title="Planned Features"
-            >
-                Features
-            </button>
+            {focusedArtifactIndex !== null ? (
+                <div className="flex items-center gap-3">
+                    <button 
+                        className="nav-btn font-semibold flex items-center gap-1.5 hover:text-white transition-all bg-[#ec4899]/10 text-white border border-[#ec4899]/20"
+                        onClick={() => setFocusedArtifactIndex(null)}
+                        title="Return to grid view"
+                    >
+                        <ArrowLeftIcon /> Grid View
+                    </button>
+                    {currentSession && currentSession.artifacts[focusedArtifactIndex] && (
+                        <div className="focused-page-indicator font-mono hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-white/5 border border-white/10 rounded-full text-xs text-stone-400">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#ec4899] animate-pulse"></span>
+                            Editing: <span className="text-white font-medium">{currentSession.artifacts[focusedArtifactIndex].styleName}</span>
+                        </div>
+                    )}
+                </div>
+            ) : (
+                <>
+                    <button 
+                        className="nav-btn"
+                        onClick={() => setShowFeatures(true)}
+                        title="Planned Features"
+                    >
+                        Features
+                    </button>
 
-            <button 
-                className="nav-btn"
-                onClick={() => setDrawerState({ isOpen: true, mode: 'templates', title: 'Templates', data: null })}
-                title="Browse Templates"
-            >
-                Templates
-            </button>
+                    <button 
+                        className="nav-btn"
+                        onClick={() => setDrawerState({ isOpen: true, mode: 'templates', title: 'Templates', data: null })}
+                        title="Browse Templates"
+                    >
+                        Templates
+                    </button>
 
-            <button 
-                className="nav-btn"
-                onClick={handleShowLibrary}
-                title="Your Library"
-            >
-                <BookmarkFilledIcon /> Library
-            </button>
+                    <button 
+                        className="nav-btn"
+                        onClick={handleShowLibrary}
+                        title="Your Library"
+                    >
+                        <BookmarkFilledIcon /> Library
+                    </button>
 
-            {hasStarted && (
-                <button 
-                    className="nav-btn reset-btn-small" 
-                    onClick={handleReset}
-                    title="Start Over"
-                >
-                    <HomeIcon />
-                </button>
+                    {hasStarted && sessions.some(s => s.artifacts.some(a => a.html && a.status === 'complete')) && (
+                        <button 
+                            className={`nav-btn font-semibold flex items-center gap-1 bg-[#ec4899]/10 text-white hover:bg-[#ec4899]/25 border border-[#ec4899]/25 transition-all duration-300 ${isRouterActive ? 'glow-active active' : ''}`}
+                            onClick={() => setIsRouterActive(!isRouterActive)}
+                            title="Orchestrate and link independent pages together in real-time"
+                            style={{
+                                boxShadow: isRouterActive ? '0 0 12px rgba(255, 0, 128, 0.4)' : undefined,
+                                borderColor: isRouterActive ? '#ff4b91' : undefined
+                            }}
+                        >
+                            🖥️ State Router Map
+                        </button>
+                    )}
+
+                    {hasStarted && (
+                        <button 
+                            className="nav-btn reset-btn-small" 
+                            onClick={handleReset}
+                            title="Start Over"
+                        >
+                            <HomeIcon />
+                        </button>
+                    )}
+                </>
             )}
         </div>
 
@@ -438,6 +474,26 @@ function App() {
                 setAttachments={setAttachments}
             />
 
+            {isRouterActive && (
+                <div className="absolute inset-0 p-6 pt-16 bg-[#050507] flex flex-col backdrop-blur-md" style={{ zIndex: 10100 }}>
+                    <SemanticRouter 
+                        sessions={sessions}
+                        onUpdateArtifactHtml={(sessId, artId, newHtml) => {
+                            const sIdx = sessions.findIndex(s => s.id === sessId);
+                            if (sIdx !== -1) {
+                                const aIdx = sessions[sIdx].artifacts.findIndex(a => a.id === artId);
+                                if (aIdx !== -1) {
+                                    updateSessionArtifact(sIdx, aIdx, newHtml);
+                                }
+                            }
+                        }}
+                        refactorCode={refactorCode}
+                        generateTailoredRecommendations={generateTailoredRecommendations}
+                        onClose={() => setIsRouterActive(false)}
+                    />
+                </div>
+            )}
+
              {canGoBack && (
                 <button className="nav-handle left" onClick={prevItem} aria-label="Previous">
                     <ArrowLeftIcon />
@@ -449,65 +505,89 @@ function App() {
                 </button>
              )}
 
-            <div className={`action-bar ${focusedArtifactIndex !== null ? 'visible' : ''}`}>
+            <div className={`action-bar ${focusedArtifactIndex !== null && !isRouterActive ? 'visible' : ''}`}>
                  <div className="action-buttons">
-                    <button onClick={prevItem} disabled={!canGoBack}>
-                        <ArrowLeftIcon /> Back
-                    </button>
-                    <button onClick={() => setFocusedArtifactIndex(null)}>
-                        <GridIcon /> Grid View
-                    </button>
-                    {currentSession && focusedArtifactIndex !== null && (
-                        <button onClick={() => setIsImmersiveModalOpen(true)} className="popout-trigger-btn font-bold">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
-                                <path d="M15 3h6v6" />
-                                <path d="M9 21H3v-6" />
-                                <path d="M21 3l-7 7" />
-                                <path d="M3 21l7-7" />
-                            </svg> 
-                            Full Popout
-                        </button>
-                    )}
+                     {/* Step 1: Compact Pagination controls */}
+                     <div className="flex items-center bg-white/5 border border-white/10 rounded-full p-0.5 gap-0.5 select-none" style={{ pointerEvents: 'auto' }}>
+                         <button 
+                             onClick={prevItem} 
+                             disabled={!canGoBack} 
+                             className="p-1 px-2.5 rounded-full hover:bg-white/10 disabled:opacity-20 disabled:pointer-events-none transition-all flex items-center justify-center text-stone-300"
+                             title="Previous Page"
+                             style={{ background: 'none', border: 'none', boxShadow: 'none' }}
+                         >
+                             <ArrowLeftIcon />
+                         </button>
+                         <span className="text-[11px] font-mono font-bold px-1 text-stone-400">
+                             {(focusedArtifactIndex ?? 0) + 1} / {currentSession?.artifacts.length || 1}
+                         </span>
+                         <button 
+                             onClick={nextItem} 
+                             disabled={!canGoForward} 
+                             className="p-1 px-2.5 rounded-full hover:bg-white/10 disabled:opacity-20 disabled:pointer-events-none transition-all flex items-center justify-center text-stone-350"
+                             title="Next Page"
+                             style={{ background: 'none', border: 'none', boxShadow: 'none' }}
+                         >
+                             <ArrowRightIcon />
+                         </button>
+                     </div>
 
-                    {currentSession && focusedArtifactIndex !== null && (
-                        <>
-                            <button 
-                                onClick={() => toggleFavorite(currentSession.id, currentSession.artifacts[focusedArtifactIndex].id)}
-                                className={currentSession.artifacts[focusedArtifactIndex].isFavorite ? 'active' : ''}
-                            >
-                                {currentSession.artifacts[focusedArtifactIndex].isFavorite ? <StarFilledIcon /> : <StarIcon />}
-                                {currentSession.artifacts[focusedArtifactIndex].isFavorite ? 'Favorited' : 'Favorite'}
-                            </button>
+                     {/* Step 2: Document State Icons (Favorite, Save, Full Popout) */}
+                     {currentSession && focusedArtifactIndex !== null && (
+                         <div className="flex items-center gap-1 bg-white/5 border border-white/10 rounded-full p-0.5" style={{ pointerEvents: 'auto' }}>
+                             <button 
+                                 onClick={() => toggleFavorite(currentSession.id, currentSession.artifacts[focusedArtifactIndex].id)}
+                                 className={`p-1.5 rounded-full hover:bg-white/10 transition-all flex items-center justify-center ${currentSession.artifacts[focusedArtifactIndex].isFavorite ? 'text-yellow-400 bg-yellow-400/15' : 'text-stone-400'}`}
+                                 title={currentSession.artifacts[focusedArtifactIndex].isFavorite ? 'Favorited' : 'Add to Favorites'}
+                                 style={{ background: 'none', border: 'none', boxShadow: 'none' }}
+                             >
+                                 {currentSession.artifacts[focusedArtifactIndex].isFavorite ? <StarFilledIcon /> : <StarIcon />}
+                             </button>
 
-                            <button 
-                                onClick={() => toggleSave(currentSession.id, currentSession.artifacts[focusedArtifactIndex].id)}
-                                className={currentSession.artifacts[focusedArtifactIndex].isSaved ? 'active' : ''}
-                            >
-                                {currentSession.artifacts[focusedArtifactIndex].isSaved ? <BookmarkFilledIcon /> : <BookmarkIcon />}
-                                {currentSession.artifacts[focusedArtifactIndex].isSaved ? 'Saved' : 'Save'}
-                            </button>
-                        </>
-                    )}
+                             <button 
+                                 onClick={() => toggleSave(currentSession.id, currentSession.artifacts[focusedArtifactIndex].id)}
+                                 className={`p-1.5 rounded-full hover:bg-white/10 transition-all flex items-center justify-center ${currentSession.artifacts[focusedArtifactIndex].isSaved ? 'text-pink-400 bg-pink-400/15' : 'text-stone-400'}`}
+                                 title={currentSession.artifacts[focusedArtifactIndex].isSaved ? 'Saved to Library' : 'Save to Library'}
+                                 style={{ background: 'none', border: 'none', boxShadow: 'none' }}
+                             >
+                                 {currentSession.artifacts[focusedArtifactIndex].isSaved ? <BookmarkFilledIcon /> : <BookmarkIcon />}
+                             </button>
 
-                    <button onClick={handleGenerateVariationsClick} disabled={isLoading}>
-                        <SparklesIcon /> Variations
-                    </button>
-                    <button onClick={handleShowAITools} disabled={isLoading}>
-                        <MagicWandIcon /> AI Tools
-                    </button>
-                    <button onClick={handleShowAnimations} disabled={isLoading}>
-                        <SparklesIcon /> Animate
-                    </button>
-                    <button onClick={handleShowRecommended} disabled={isLoading}>
-                        <LayoutIcon /> Recommended
-                    </button>
-                    <button onClick={handleShowCode}>
-                        <CodeIcon /> Source
-                    </button>
-                    <button onClick={nextItem} disabled={!canGoForward}>
-                        Next <ArrowRightIcon />
-                    </button>
-                 </div>
+                             <div className="w-[1px] h-4 bg-white/10 mx-0.5"></div>
+
+                             <button 
+                                 onClick={() => setIsImmersiveModalOpen(true)} 
+                                 className="p-1.5 rounded-full hover:bg-white/10 text-stone-300 transition-all flex items-center justify-center"
+                                 title="Open Full Popout View"
+                                 style={{ background: 'none', border: 'none', boxShadow: 'none' }}
+                             >
+                                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                     <path d="M15 3h6v6" />
+                                     <path d="M9 21H3v-6" />
+                                     <path d="M21 3l-7 7" />
+                                     <path d="M3 21l7-7" />
+                                 </svg>
+                             </button>
+                         </div>
+                     )}
+
+                     {/* Step 3: Powerful AI Wizards & Creators */}
+                     <button onClick={handleGenerateVariationsClick} disabled={isLoading} title="Generate style/content variations">
+                         <SparklesIcon /> Variations
+                     </button>
+                     <button onClick={handleShowAITools} disabled={isLoading} title="Trigger custom AI refactors / enhancements">
+                         <MagicWandIcon /> AI Tools
+                     </button>
+                     <button onClick={handleShowAnimations} disabled={isLoading} title="Inject transition animations">
+                         <SparklesIcon /> Animate
+                     </button>
+                     <button onClick={handleShowRecommended} disabled={isLoading} title="Get related layout blueprints">
+                         <LayoutIcon /> Layouts
+                     </button>
+                     <button onClick={handleShowCode} className="font-semibold text-white bg-[#ec4899]/15 border-[#ec4899]/30 hover:bg-[#ec4899]/30" title="Inspect page markup & styling">
+                         <CodeIcon /> Source
+                     </button>
+                  </div>
             </div>
 
             {isPromptCollapsed && hasStarted && (

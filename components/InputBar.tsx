@@ -398,7 +398,7 @@ export default function InputBar({
                                         }} 
                                         onKeyDown={handleKeyDown} 
                                         disabled={isLoading} 
-                                        placeholder=""
+                                        placeholder={attachments.length > 0 ? "Describe how you'd like to combine or use these files to generate your UI (e.g. \"Rebuild the mortgage lender landing page combining these files\")..." : "Choose a template or type your custom requirement here..."}
                                         rows={isExpanded ? 10 : 3}
                                     />
                                 ) : (

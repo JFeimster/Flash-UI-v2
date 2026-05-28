@@ -103,7 +103,7 @@ export default function SessionDeck({
         <div className={`stage-container ${focusedArtifactIndex !== null ? 'mode-focus' : 'mode-split'}`}>
              
              {/* Search Bar */}
-             {hasStarted && (
+             {hasStarted && focusedArtifactIndex === null && (
                  <div className={`search-container ${hasStarted ? 'visible' : ''}`}>
                      <div className="search-input-wrapper">
                          <SearchIcon />
