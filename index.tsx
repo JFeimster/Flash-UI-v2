@@ -122,7 +122,8 @@ function App() {
     applyAnimation,
     suggestComponents,
     generateAdditionalFile,
-    generateTailoredRecommendations
+    generateTailoredRecommendations,
+    generateIdeaSuggestions
   } = useGenAI();
 
   const {
@@ -498,6 +499,7 @@ function App() {
                 generateAdditionalFile={generateAdditionalFile}
                 onUpdateArtifactFiles={handleUpdateArtifactFiles}
                 generateTailoredRecommendations={generateTailoredRecommendations}
+                generateIdeaSuggestions={generateIdeaSuggestions}
                 onRefactorApply={(newHtml) => {
                     if (focusedArtifactIndex !== null) {
                         updateSessionArtifact(currentSessionIndex, focusedArtifactIndex, newHtml);

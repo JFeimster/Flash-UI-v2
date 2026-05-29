@@ -867,6 +867,53 @@ Return ONLY a JSON object with this exact schema:
         }
     }, [getAiClient]);
 
+    const generateIdeaSuggestions = useCallback(async (ideaInput: string, techStack?: string) => {
+        try {
+            const ai = getAiClient();
+            let prompt = `You are an elite Product Strategist & Tech Lead. Sourced from the user's concept idea or input: "${ideaInput}".\n\n`;
+            
+            if (techStack) {
+                prompt += `THE ACTIVE TECH STACK & LOCAL ENVIRONMENT:\nThe project operates in the following tech environment: "${techStack}". Recommendations must fully align with this.\n\n`;
+            }
+            
+            prompt += `Search the live web with Google Search Grounding to find relevant current trends, competitor services, best-practice packages, API integration schemes, or workflows related to this concept.
+Suggest:
+1. Three modern, validated SaaS/product concepts or extensions based on the input that are highly feasible and valuable.
+2. A list of 4 highly recommended tech stack dependencies or local packages (e.g., matching the user's stack) that should be used, with a brief explanation of why.
+3. Three custom integration pathways or workflows using automation platforms (Notion databases, n8n webhook routes, Make.com triggers, Wix Velo widgets, ChatGPT API agents, Vertex AI models, Tally Forms automation) that would amplify the product's capability.
+
+Return ONLY a JSON object with this exact structure:
+{
+  "concepts": [
+    { "title": "Concept Name", "desc": "Grounded concept explanation, citing modern trends if applicable.", "advantages": "Why it's a solid solution." }
+  ],
+  "dependencies": [
+    { "name": "npm-or-sdk-package-name", "reason": "Why it is needed and how it adds magic." }
+  ],
+  "integrations": [
+    { "tool": "Notion | n8n | Make | Wix | ChatGPT | Vertex AI | Tally", "route": "How it is set up", "outcome": "What value it brings." }
+  ]
+}`;
+
+            const config: any = {
+                responseMimeType: 'application/json',
+                tools: [{ googleSearch: {} }]
+            };
+
+            const result = await withRetry(() => ai.models.generateContent({
+                model: 'gemini-3.5-flash',
+                contents: [{ parts: [{ text: prompt }], role: 'user' }],
+                config
+            })) as GenerateContentResponse;
+
+            const parsed = JSON.parse(result.text || '{}');
+            return parsed;
+        } catch (e) {
+            console.error("Error generating idea suggestions:", e);
+            return { concepts: [], dependencies: [], integrations: [] };
+        }
+    }, [getAiClient]);
+
     const suggestComponents = useCallback(async (currentPrompt: string) => {
         try {
             const ai = getAiClient();
@@ -1075,6 +1122,7 @@ STRICT REQUIREMENTS:
         applyAnimation,
         suggestComponents,
         generateAdditionalFile,
-        generateTailoredRecommendations
+        generateTailoredRecommendations,
+        generateIdeaSuggestions
     };
 }

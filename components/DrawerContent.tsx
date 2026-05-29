@@ -50,6 +50,11 @@ interface DrawerContentProps {
     generateAdditionalFile?: (baseHtml: string, filename: string, description: string, outputFormat?: string) => Promise<string>;
     onUpdateArtifactFiles?: (sessionId: string, artifactId: string, files: Record<string, string>) => void;
     generateTailoredRecommendations?: (currentPrompt: string, html: string, techStack?: string, searchQuery?: string) => Promise<{ components: string[], integrations: string[], apis: string[] }>;
+    generateIdeaSuggestions?: (ideaInput: string, techStack?: string) => Promise<{
+        concepts: { title: string; desc: string; advantages: string }[];
+        dependencies: { name: string; reason: string }[];
+        integrations: { tool: string; route: string; outcome: string }[];
+    }>;
 }
 
 const FORMATS = [
@@ -137,7 +142,8 @@ export default function DrawerContent({
     applyAnimation,
     generateAdditionalFile,
     onUpdateArtifactFiles,
-    generateTailoredRecommendations
+    generateTailoredRecommendations,
+    generateIdeaSuggestions
 }: DrawerContentProps) {
     const [downloadFormat, setDownloadFormat] = useState<'static' | 'nextjs' | 'wix' | 'notion' | 'react' | 'vue' | 'svelte'>('static');
     const [recommendedFormat, setRecommendedFormat] = useState<string>('');
@@ -195,6 +201,74 @@ export default function DrawerContent({
     const [isInjecting, setIsInjecting] = useState(false);
     const [injectionStatus, setInjectionStatus] = useState<string | null>(null);
     const [isTailoring, setIsTailoring] = useState(false);
+
+    // Real-Time AI Idea Sourcing & Suggestions state
+    const [ideaInput, setIdeaInput] = useState('');
+    const [isSourcingIdeas, setIsSourcingIdeas] = useState(false);
+    const [sourcingFeedback, setSourcingFeedback] = useState<string | null>(null);
+    const [sourcedIdeas, setSourcedIdeas] = useState<{
+        concepts: { title: string; desc: string; advantages: string }[];
+        dependencies: { name: string; reason: string }[];
+        integrations: { tool: string; route: string; outcome: string }[];
+    } | null>(null);
+
+    const handleSourceIdeas = async () => {
+        if (!ideaInput.trim() || !generateIdeaSuggestions) return;
+        setIsSourcingIdeas(true);
+        setSourcingFeedback("Grounding query and crawling live competitor services & frameworks...");
+        try {
+            const result = await generateIdeaSuggestions(ideaInput, localTechStack);
+            setSourcedIdeas(result);
+            setSourcingFeedback("Bespoke SaaS concepts, dependencies, and workspace flows loaded!");
+            setTimeout(() => setSourcingFeedback(null), 3500);
+        } catch (e) {
+            console.error(e);
+            setSourcingFeedback("Failed to source ideas. Try checking network connection.");
+            setTimeout(() => setSourcingFeedback(null), 3000);
+        } finally {
+            setIsSourcingIdeas(false);
+        }
+    };
+
+    const handleAddToStack = (pkgName: string) => {
+        let currentStack = localTechStack.split(',').map(s => s.trim()).filter(Boolean);
+        if (!currentStack.some(s => s.toLowerCase() === pkgName.toLowerCase())) {
+            currentStack.push(pkgName);
+            const val = currentStack.join(', ');
+            setLocalTechStack(val);
+            localStorage.setItem('flash_ui_tech_stack', val);
+        }
+    };
+
+    const handleAddSourcedIntegration = (tool: string, route: string, outcome: string) => {
+        const itemText = `${tool} (${route}): ${outcome}`;
+        setCustomIntegrations(prev => {
+            if (!prev.includes(itemText)) {
+                return [...prev, itemText];
+            }
+            return prev;
+        });
+        setCheckedIntegrations(curr => {
+            const next = new Set(curr);
+            next.add(itemText);
+            return next;
+        });
+    };
+
+    const handleAddSourcedComponent = (compTitle: string, compDesc: string) => {
+        const itemText = `${compTitle}: ${compDesc}`;
+        setCustomComponents(prev => {
+            if (!prev.includes(itemText)) {
+                return [...prev, itemText];
+            }
+            return prev;
+        });
+        setCheckedComponents(curr => {
+            const next = new Set(curr);
+            next.add(itemText);
+            return next;
+        });
+    };
 
     // Multi-file state
     const [activeFile, setActiveFile] = useState<string>('');
@@ -492,6 +566,13 @@ export default function DrawerContent({
 
     const DEFAULT_INTEGRATIONS = [
         { name: "Firebase Firestore & Auth", desc: "Allows sign-in and saving artifacts to user portfolios with secure rules." },
+        { name: "Notion Workspace Sync", desc: "Embeds pages, manages client databases, logs feedback and lists tasks inside Notion spaces." },
+        { name: "n8n Workflow Automation", desc: "Automates multi-step integrations and pushes custom event payloads to self-hosted n8n nodes." },
+        { name: "Make.com (Integromat) Webhooks", desc: "Syncs form submissions and triggers advanced automated scenario pipelines on Make." },
+        { name: "Wix Velo Site Embed", desc: "Pre-configures developer schemas and custom interactions for easy drag-drop deployment inside Wix sites." },
+        { name: "ChatGPT Core API Integration", desc: "Enables smart contextual prompt layers, intelligent replies, and custom GPT features." },
+        { name: "Google Gems & Vertex AI", desc: "Leverages custom model personas, live grounding filters, and enterprise GenAI capabilities." },
+        { name: "Tally Forms Database Sync", desc: "Integrates beautiful custom form templates with webhooks and direct database entries." },
         { name: "Google Drive & Google Picker", desc: "Saves generated code files directly in Drive and browses asset references." },
         { name: "Google Sheets Grounding", desc: "Integrates spreadsheets context dynamically into the UI as a database grid." },
         { name: "Google Calendar & Tasks", desc: "Saves schedules, events, or todo boards back to the user's active workspace." },
@@ -506,6 +587,13 @@ export default function DrawerContent({
     ];
 
     const DEFAULT_APIS = [
+        { name: "Notion Databases API", type: "Workspace Integration", desc: "Appends client feedback and lead tables directly to Notion pages." },
+        { name: "n8n Action Trigger Webhook", type: "Automation Hub", desc: "Triggers downstream tasks in self-hosted or cloud n8n flows on client events." },
+        { name: "Make.com Scenario Endpoint", type: "Scenario Automation", desc: "Posts structured payloads to Make workflows for cross-postings and automation." },
+        { name: "Wix Velo Backend Router", type: "Wix Backend", desc: "Maps serverless Wix functions and collections to custom web actions." },
+        { name: "OpenAI GPT-4o Completions API", type: "Conversational AI", desc: "Produces multi-turn conversational answers, text summaries, and agent reasoning." },
+        { name: "Google Vertex AI Models API", type: "Enterprise GenAI", desc: "Enables fine-tuned enterprise models on GCP secure infrastructures." },
+        { name: "Tally Form Submission Listener", type: "Forms Webhooks", desc: "Captures and processes live Tally Form submissions with secure database entries." },
         { name: "Stripe Subscriptions API", type: "Payment Processing", desc: "Fledges out subscriptions checkout and billing status pill elements." },
         { name: "SendGrid SMTP Mailer API", type: "Transactional Email", desc: "Automates scheduled report dispatches and verification triggers." },
         { name: "Twilio SMS & Alert API", type: "Notifications", desc: "Triggers urgent custom text indicators, verification codes, and client messages." },
@@ -1650,7 +1738,7 @@ INSTRUCTIONS:
                                     Click any of these popular tools to instantly toggle/add them to your stack context:
                                 </div>
                                 <div className="tech-stack-pills">
-                                    {['React', 'Vite', 'Supabase', 'Stripe', 'Tailwind', 'Clerk', 'Framer Motion', 'Resend', 'Prisma', 'PostgreSQL', 'MongoDB', 'Redis', 'Lucide Icons', 'Recharts'].map((tool) => {
+                                    {['React', 'Vite', 'Notion', 'n8n', 'Make.com', 'Wix', 'ChatGPT', 'Google Gems', 'Tally', 'Supabase', 'Stripe', 'Tailwind', 'Clerk', 'Framer Motion', 'Resend', 'Prisma', 'PostgreSQL', 'MongoDB', 'Redis', 'Lucide Icons', 'Recharts'].map((tool) => {
                                         const toolsList = localTechStack.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
                                         const isActive = toolsList.includes(tool.toLowerCase());
                                         return (
@@ -1740,6 +1828,130 @@ INSTRUCTIONS:
                                         </button>
                                     ))}
                                 </div>
+                            </div>
+
+                            {/* AI Sourced Suggestions Section */}
+                            <div className="grounding-section bg-gradient-to-r from-emerald-950/20 to-teal-900/10 border border-emerald-500/20" style={{ marginTop: '24px', padding: '16px', borderRadius: '12px', border: '1px solid rgba(16,185,129,0.2)', backgroundColor: 'rgba(16,185,129,0.03)' }}>
+                                <div className="grounding-section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#10b981', fontWeight: 600, fontSize: '1rem' }}>
+                                    💡 Real-Time AI Idea Sourcing & Suggestions (Google Grounded)
+                                </div>
+                                <p className="grounding-subtitle-helper" style={{ fontSize: '0.8rem', opacity: 0.8, color: '#a1a1aa', marginTop: '6px', lineHeight: '1.4' }}>
+                                    Describe any product goal, SaaS model, or specific problem you wish to solve. Gemini will search the live web to suggest curated, validated features, key NPM packages, and automation pathways.
+                                </p>
+                                <div className="realtime-search-container" style={{ marginTop: '12px' }}>
+                                    <div className="realtime-search-field" style={{ display: 'flex', gap: '8px' }}>
+                                        <input 
+                                            type="text" 
+                                            placeholder="E.g., 'Fitness planner SaaS integrated with Notion', 'E-commerce store with Tally database'..."
+                                            value={ideaInput}
+                                            onChange={(e) => setIdeaInput(e.target.value)}
+                                            className="realtime-search-input-box"
+                                            style={{ flex: 1, backgroundColor: '#09090b', border: '1px solid #27272a', padding: '8px 12px', borderRadius: '6px', color: '#fff', fontSize: '0.85rem' }}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' && ideaInput.trim()) {
+                                                    handleSourceIdeas();
+                                                }
+                                            }}
+                                        />
+                                        <button 
+                                            onClick={handleSourceIdeas}
+                                            disabled={isSourcingIdeas || !ideaInput.trim()}
+                                            className="realtime-ground-btn"
+                                            style={{ padding: '0 20px', minHeight: '42px', minWidth: '140px', background: '#10b981', color: '#fff', borderRadius: '6px', cursor: 'pointer', border: 'none', fontWeight: 500, fontSize: '0.85rem' }}
+                                        >
+                                            {isSourcingIdeas ? <ThinkingIcon /> : "🌐 Source Ideas"}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {sourcingFeedback && (
+                                    <div className="text-emerald-400 text-xs animate-pulse font-mono mt-3 flex items-center gap-2" style={{ color: '#34d399', fontSize: '12px', fontFamily: 'monospace', marginTop: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <div className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" style={{ width: '8px', height: '8px', borderRadius: '9999px', backgroundColor: '#34d399' }}></div>
+                                        {sourcingFeedback}
+                                    </div>
+                                )}
+
+                                {sourcedIdeas && (
+                                    <div className="sourced-results-container mt-4 space-y-4" style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '16px' }}>
+                                        {/* Sourced SaaS Concepts */}
+                                        {sourcedIdeas.concepts && sourcedIdeas.concepts.length > 0 && (
+                                            <div className="sourced-result-sub">
+                                                <div className="text-xs font-semibold text-emerald-400 uppercase tracking-widest mb-2 font-mono" style={{ fontSize: '11px', color: '#34d399', fontWeight: 600, letterSpacing: '0.1em', fontFamily: 'monospace', marginBottom: '8px' }}>🎯 SOURCED MODERN CONCEPTS</div>
+                                                <div className="grid gap-3 sm:grid-cols-1" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                    {sourcedIdeas.concepts.map((concept, i) => (
+                                                        <div key={i} className="bg-neutral-900/60 p-3 rounded-lg border border-neutral-800 flex flex-col justify-between" style={{ backgroundColor: 'rgba(24,24,27,0.6)', border: '1px solid #27272a', padding: '12px', borderRadius: '8px' }}>
+                                                            <div>
+                                                                <h4 className="text-sm font-medium text-white mb-1" style={{ fontSize: '0.9rem', color: '#fff', fontWeight: 500, margin: '0 0 4px 0' }}>{concept.title}</h4>
+                                                                <p className="text-xs text-neutral-400 mb-2 leading-relaxed" style={{ fontSize: '0.75rem', color: '#a1a1aa', lineHeight: 1.4, margin: '0 0 8px 0' }}>{concept.desc}</p>
+                                                                <div className="text-xs text-neutral-500 bg-neutral-950 p-2 rounded italic" style={{ fontSize: '0.75rem', backgroundColor: '#09090b', color: '#71717a', padding: '8px', borderRadius: '4px', fontStyle: 'italic' }}>
+                                                                    <strong style={{ color: '#a1a1aa' }}>Advantage:</strong> {concept.advantages}
+                                                                </div>
+                                                            </div>
+                                                            <button 
+                                                                className="text-xs font-mono text-emerald-400 hover:text-emerald-300 mt-2 self-start flex items-center gap-1 bg-emerald-500/10 hover:bg-emerald-500/20 px-2 py-1 rounded"
+                                                                style={{ backgroundColor: 'rgba(16,185,129,0.1)', color: '#10b981', border: 'none', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontFamily: 'monospace', cursor: 'pointer', alignSelf: 'flex-start', marginTop: '8px' }}
+                                                                onClick={() => handleAddSourcedComponent(concept.title, concept.desc)}
+                                                            >
+                                                                + Add to Component Checklist
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Sourced Recommended Dependencies */}
+                                        {sourcedIdeas.dependencies && sourcedIdeas.dependencies.length > 0 && (
+                                            <div className="sourced-result-sub" style={{ marginTop: '12px' }}>
+                                                <div className="text-xs font-semibold text-teal-400 uppercase tracking-widest mb-2 font-mono" style={{ fontSize: '11px', color: '#2dd4bf', fontWeight: 600, letterSpacing: '0.1em', fontFamily: 'monospace', marginBottom: '8px' }}>📦 RECOMMENDED NPM DEPENDENCIES</div>
+                                                <div className="grid gap-2 grid-cols-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '8px' }}>
+                                                    {sourcedIdeas.dependencies.map((dep, i) => (
+                                                        <div key={i} className="bg-neutral-900/60 p-2 rounded-lg border border-neutral-800 flex flex-col justify-between" style={{ backgroundColor: 'rgba(24,24,27,0.6)', border: '1px solid #27272a', padding: '10px', borderRadius: '8px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                                                            <div>
+                                                                <span className="text-xs font-mono text-white bg-neutral-950 px-2 py-0.5 rounded border border-neutral-800 inline-block mb-1" style={{ backgroundColor: '#09090b', border: '1px solid #27272a', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontFamily: 'monospace', display: 'inline-block' }}>{dep.name}</span>
+                                                                <p className="text-[11px] text-neutral-400 leading-normal" style={{ fontSize: '11px', color: '#a1a1aa', margin: '4px 0 0 0', lineHeight: 1.3 }}>{dep.reason}</p>
+                                                            </div>
+                                                            <button 
+                                                                className="text-[10px] font-mono text-teal-400 hover:text-teal-300 mt-2 self-start bg-teal-500/10 hover:bg-teal-500/20 px-1.5 py-0.5 rounded"
+                                                                style={{ backgroundColor: 'rgba(20,184,166,0.1)', color: '#14b8a6', border: 'none', padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontFamily: 'monospace', cursor: 'pointer', alignSelf: 'flex-start', marginTop: '6px' }}
+                                                                onClick={() => handleAddToStack(dep.name)}
+                                                            >
+                                                                + Add to Stack Context
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Sourced Workspace/Automation flows */}
+                                        {sourcedIdeas.integrations && sourcedIdeas.integrations.length > 0 && (
+                                            <div className="sourced-result-sub border-t border-neutral-800 pt-3" style={{ borderTop: '1px solid #27272a', paddingTop: '12px', marginTop: '12px' }}>
+                                                <div className="text-xs font-semibold text-indigo-400 uppercase tracking-widest mb-2 font-mono" style={{ fontSize: '11px', color: '#818cf8', fontWeight: 600, letterSpacing: '0.1em', fontFamily: 'monospace', marginBottom: '8px' }}>⚡ AUTOMATION & WORKSPACE FLOWS</div>
+                                                <div className="space-y-2" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                    {sourcedIdeas.integrations.map((integ, i) => (
+                                                        <div key={i} className="bg-neutral-900/60 p-3 rounded-lg border border-neutral-800 flex items-center justify-between gap-4" style={{ backgroundColor: 'rgba(24,24,27,0.6)', border: '1px solid #27272a', padding: '12px', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                                                            <div style={{ flex: 1 }}>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                    <span className="text-xs font-semibold text-white" style={{ fontSize: '0.8rem', color: '#fff' }}>{integ.tool}</span>
+                                                                    <span className="text-[10px] text-indigo-300 bg-indigo-950 px-2 py-0.5 rounded font-mono" style={{ backgroundColor: '#1e1b4b', color: '#c7d2fe', padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontFamily: 'monospace' }}>{integ.route}</span>
+                                                                </div>
+                                                                <p className="text-xs text-neutral-400 mt-1" style={{ fontSize: '0.75rem', color: '#a1a1aa', margin: '4px 0 0 0' }}>{integ.outcome}</p>
+                                                            </div>
+                                                            <button 
+                                                                className="text-xs font-mono text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 px-2 py-1 rounded"
+                                                                style={{ backgroundColor: 'rgba(99,102,241,0.1)', color: '#6366f1', border: 'none', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontFamily: 'monospace', cursor: 'pointer' }}
+                                                                onClick={() => handleAddSourcedIntegration(integ.tool, integ.route, integ.outcome)}
+                                                            >
+                                                                + Add Integration
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
 
                             {/* Overview / Feedback State */}
