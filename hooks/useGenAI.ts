@@ -89,13 +89,25 @@ export const useGenAI = () => {
                 try {
                     // Load or init user document
                     const userDocRef = doc(db, 'users', user.uid);
-                    const userDoc = await getDoc(userDocRef);
+                    let userDoc;
+                    try {
+                        userDoc = await getDoc(userDocRef);
+                    } catch (error) {
+                        handleFirestoreError(error, OperationType.GET, `users/${user.uid}`);
+                        throw error;
+                    }
+
                     if (!userDoc.exists()) {
-                        await setDoc(userDocRef, {
-                            id: user.uid,
-                            email: user.email,
-                            createdAt: new Date().toISOString()
-                        });
+                        try {
+                            await setDoc(userDocRef, {
+                                id: user.uid,
+                                email: user.email,
+                                createdAt: new Date().toISOString()
+                            });
+                        } catch (error) {
+                            handleFirestoreError(error, OperationType.CREATE, `users/${user.uid}`);
+                            throw error;
+                        }
                     } else {
                         const userData = userDoc.data();
                         if (userData && userData.userApiKey) {
@@ -104,7 +116,14 @@ export const useGenAI = () => {
                     }
 
                     // Load user sessions
-                    const sessionsSnap = await getDocs(collection(db, 'users', user.uid, 'sessions'));
+                    let sessionsSnap;
+                    try {
+                        sessionsSnap = await getDocs(collection(db, 'users', user.uid, 'sessions'));
+                    } catch (error) {
+                        handleFirestoreError(error, OperationType.LIST, `users/${user.uid}/sessions`);
+                        throw error;
+                    }
+
                     const loadedSessions: Session[] = [];
                     sessionsSnap.forEach((docSnap) => {
                         loadedSessions.push(docSnap.data() as Session);
@@ -113,7 +132,14 @@ export const useGenAI = () => {
                     setSessions(loadedSessions);
 
                     // Load user saved artifacts
-                    const savedSnap = await getDocs(collection(db, 'users', user.uid, 'savedArtifacts'));
+                    let savedSnap;
+                    try {
+                        savedSnap = await getDocs(collection(db, 'users', user.uid, 'savedArtifacts'));
+                    } catch (error) {
+                        handleFirestoreError(error, OperationType.LIST, `users/${user.uid}/savedArtifacts`);
+                        throw error;
+                    }
+
                     const loadedSaved: Artifact[] = [];
                     savedSnap.forEach((docSnap) => {
                         loadedSaved.push(docSnap.data() as Artifact);

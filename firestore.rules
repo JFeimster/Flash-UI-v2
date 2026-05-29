@@ -32,8 +32,9 @@ service cloud.firestore {
     function isValidUser(data, userId) {
       return data.id == userId
         && data.id == request.auth.uid
-        && (data.email == null || (data.email is string && data.email.size() <= 150))
-        && (data.userApiKey == null || (data.userApiKey is string && data.userApiKey.size() <= 200));
+        && ('createdAt' in data && data.createdAt is string && data.createdAt.size() <= 100)
+        && (!('email' in data) || data.email == null || (data.email is string && data.email.size() <= 150))
+        && (!('userApiKey' in data) || data.userApiKey == null || (data.userApiKey is string && data.userApiKey.size() <= 200));
     }
 
     function isValidSession(data, userId) {
@@ -43,7 +44,8 @@ service cloud.firestore {
         && data.prompt is string && data.prompt.size() <= 10000
         && data.timestamp is number
         && data.artifacts is list
-        && (data.contextUrl == null || (data.contextUrl is string && data.contextUrl.size() <= 2083));
+        && (!('contextUrl' in data) || data.contextUrl == null || (data.contextUrl is string && data.contextUrl.size() <= 2083))
+        && (!('attachments' in data) || data.attachments is list);
     }
 
     function isValidArtifact(data) {
@@ -65,14 +67,16 @@ service cloud.firestore {
 
     // 2. Chat/Generations Sessions
     match /users/{userId}/sessions/{sessionId} {
-      allow get, list, delete: if isOwner(userId) && isValidId(sessionId);
+      allow list: if isOwner(userId);
+      allow get, delete: if isOwner(userId) && isValidId(sessionId);
       allow create: if isOwner(userId) && isValidId(sessionId) && isValidSession(incoming(), userId);
       allow update: if isOwner(userId) && isValidId(sessionId) && isValidSession(incoming(), userId);
     }
 
     // 3. Saved Artifacts (Library)
     match /users/{userId}/savedArtifacts/{artifactId} {
-      allow get, list, delete: if isOwner(userId) && isValidId(artifactId);
+      allow list: if isOwner(userId);
+      allow get, delete: if isOwner(userId) && isValidId(artifactId);
       allow create: if isOwner(userId) && isValidId(artifactId) && isValidArtifact(incoming());
       allow update: if isOwner(userId) && isValidId(artifactId) && isValidArtifact(incoming());
     }
