@@ -51,6 +51,25 @@ export const cleanHtmlString = (html: string): string => {
     return cleaned;
 };
 
+const saveSessionDoc = async (userId: string, sessionId: string, sessionData: any) => {
+    // Sanitize to prevent large payload size errors
+    const sanitizedAttachments = sessionData.attachments?.map((att: any) => ({
+        id: att.id,
+        name: att.name,
+        mimeType: att.mimeType,
+        size: att.size,
+        data: "" // Clear large base64 data to keep Firestore within 1MB limit
+    })) || [];
+
+    const sanitizedSession = {
+        ...sessionData,
+        attachments: sanitizedAttachments,
+        userId
+    };
+
+    return setDoc(doc(db, 'users', userId, 'sessions', sessionId), sanitizedSession);
+};
+
 export const useGenAI = () => {
     const [currentUser, setCurrentUser] = useState<any>(null);
     const [authLoading, setAuthLoading] = useState<boolean>(true);
@@ -365,10 +384,8 @@ Required JSON Output Format (stream ONE object per line):
 
         const user = auth.currentUser;
         if (user) {
-            setDoc(doc(db, 'users', user.uid, 'sessions', sessionId), {
-                ...newSession,
-                userId: user.uid
-            }).catch(err => handleFirestoreError(err, OperationType.CREATE, `users/${user.uid}/sessions/${sessionId}`));
+            saveSessionDoc(user.uid, sessionId, newSession)
+                .catch(err => handleFirestoreError(err, OperationType.CREATE, `users/${user.uid}/sessions/${sessionId}`));
         }
 
         try {
@@ -397,10 +414,8 @@ Required JSON Output Format (stream ONE object per line):
                 if (user) {
                     const matched = updated.find(x => x.id === sessionId);
                     if (matched) {
-                        setDoc(doc(db, 'users', user.uid, 'sessions', sessionId), {
-                            ...matched,
-                            userId: user.uid
-                        }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/sessions/${sessionId}`));
+                        saveSessionDoc(user.uid, sessionId, matched)
+                            .catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/sessions/${sessionId}`));
                     }
                 }
                 return updated;
@@ -473,10 +488,8 @@ STRICT REQUIREMENTS:
                         if (user) {
                             const matched = updated.find(x => x.id === sessionId);
                             if (matched) {
-                                setDoc(doc(db, 'users', user.uid, 'sessions', sessionId), {
-                                    ...matched,
-                                    userId: user.uid
-                                }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/sessions/${sessionId}`));
+                                saveSessionDoc(user.uid, sessionId, matched)
+                                    .catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/sessions/${sessionId}`));
                             }
                         }
                         return updated;
@@ -492,10 +505,8 @@ STRICT REQUIREMENTS:
                         if (user) {
                             const matched = updated.find(x => x.id === sessionId);
                             if (matched) {
-                                setDoc(doc(db, 'users', user.uid, 'sessions', sessionId), {
-                                    ...matched,
-                                    userId: user.uid
-                                }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/sessions/${sessionId}`));
+                                saveSessionDoc(user.uid, sessionId, matched)
+                                    .catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/sessions/${sessionId}`));
                             }
                         }
                         return updated;
@@ -527,10 +538,8 @@ STRICT REQUIREMENTS:
              const user = auth.currentUser;
              const targetSess = updated[sessionIndex];
              if (user && targetSess) {
-                 setDoc(doc(db, 'users', user.uid, 'sessions', targetSess.id), {
-                     ...targetSess,
-                     userId: user.uid
-                 }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/sessions/${targetSess.id}`));
+                 saveSessionDoc(user.uid, targetSess.id, targetSess)
+                     .catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/sessions/${targetSess.id}`));
              }
              return updated;
          });
@@ -548,10 +557,8 @@ STRICT REQUIREMENTS:
             const user = auth.currentUser;
             const targetSess = updated[sessionIndex];
             if (user && targetSess) {
-                setDoc(doc(db, 'users', user.uid, 'sessions', targetSess.id), {
-                    ...targetSess,
-                    userId: user.uid
-                }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/sessions/${targetSess.id}`));
+                saveSessionDoc(user.uid, targetSess.id, targetSess)
+                    .catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/sessions/${targetSess.id}`));
             }
             return updated;
         });
@@ -574,10 +581,8 @@ STRICT REQUIREMENTS:
             const user = auth.currentUser;
             const targetSess = updated.find(s => s.id === sessionId);
             if (user && targetSess) {
-                setDoc(doc(db, 'users', user.uid, 'sessions', sessionId), {
-                    ...targetSess,
-                    userId: user.uid
-                }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/sessions/${sessionId}`));
+                saveSessionDoc(user.uid, sessionId, targetSess)
+                    .catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/sessions/${sessionId}`));
             }
             return updated;
         });
@@ -635,10 +640,8 @@ STRICT REQUIREMENTS:
             if (user) {
                 const matched = updated.find(x => x.id === sessionId);
                 if (matched) {
-                    setDoc(doc(db, 'users', user.uid, 'sessions', sessionId), {
-                        ...matched,
-                        userId: user.uid
-                    }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/sessions/${sessionId}`));
+                    saveSessionDoc(user.uid, sessionId, matched)
+                        .catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/sessions/${sessionId}`));
                 }
             }
             return updated;
@@ -664,10 +667,8 @@ STRICT REQUIREMENTS:
             if (user) {
                 const matched = updated.find(x => x.id === sessionId);
                 if (matched) {
-                    setDoc(doc(db, 'users', user.uid, 'sessions', sessionId), {
-                        ...matched,
-                        userId: user.uid
-                    }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/sessions/${sessionId}`));
+                    saveSessionDoc(user.uid, sessionId, matched)
+                        .catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/sessions/${sessionId}`));
                 }
             }
             return updated;
@@ -712,10 +713,8 @@ STRICT REQUIREMENTS:
             if (user) {
                 const sessionWithArt = updated.find(s => s.artifacts.some(a => a.id === artifactId));
                 if (sessionWithArt) {
-                    setDoc(doc(db, 'users', user.uid, 'sessions', sessionWithArt.id), {
-                        ...sessionWithArt,
-                        userId: user.uid
-                    }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/sessions/${sessionWithArt.id}`));
+                    saveSessionDoc(user.uid, sessionWithArt.id, sessionWithArt)
+                        .catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/sessions/${sessionWithArt.id}`));
                 }
             }
             return updated;
@@ -994,10 +993,8 @@ Return ONLY a JSON array of objects with the following structure:
             if (user) {
                 const matched = updated.find(x => x.id === sessionId);
                 if (matched) {
-                    setDoc(doc(db, 'users', user.uid, 'sessions', sessionId), {
-                        ...matched,
-                        userId: user.uid
-                    }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/sessions/${sessionId}`));
+                    saveSessionDoc(user.uid, sessionId, matched)
+                        .catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/sessions/${sessionId}`));
                 }
             }
             return updated;
@@ -1085,10 +1082,8 @@ STRICT REQUIREMENTS:
                 if (user) {
                     const matched = updated.find(x => x.id === sessionId);
                     if (matched) {
-                        setDoc(doc(db, 'users', user.uid, 'sessions', sessionId), {
-                            ...matched,
-                            userId: user.uid
-                        }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/sessions/${sessionId}`));
+                        saveSessionDoc(user.uid, sessionId, matched)
+                            .catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/sessions/${sessionId}`));
                     }
                 }
                 return updated;
@@ -1105,10 +1100,8 @@ STRICT REQUIREMENTS:
                 if (user) {
                     const matched = updated.find(x => x.id === sessionId);
                     if (matched) {
-                        setDoc(doc(db, 'users', user.uid, 'sessions', sessionId), {
-                            ...matched,
-                            userId: user.uid
-                        }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/sessions/${sessionId}`));
+                        saveSessionDoc(user.uid, sessionId, matched)
+                            .catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/sessions/${sessionId}`));
                     }
                 }
                 return updated;

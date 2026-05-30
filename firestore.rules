@@ -42,7 +42,7 @@ service cloud.firestore {
         && data.userId == userId
         && data.userId == request.auth.uid
         && data.prompt is string && data.prompt.size() <= 10000
-        && data.timestamp is number
+        && (data.timestamp is int || data.timestamp is float)
         && data.artifacts is list
         && (!('contextUrl' in data) || data.contextUrl == null || (data.contextUrl is string && data.contextUrl.size() <= 2083))
         && (!('attachments' in data) || data.attachments is list);
