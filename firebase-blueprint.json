@@ -76,9 +76,33 @@
           "type": "array",
           "description": "List of attachments attached to initial query"
         },
-        "contextUrl": { "type": "string" }
+        "contextUrl": { "type": "string" },
+        "folderId": {
+          "type": "string",
+          "description": "Optional folder/project identifier for grouping"
+        }
       },
       "required": ["id", "userId", "prompt", "timestamp", "artifacts"]
+    },
+    "Folder": {
+      "title": "Folder",
+      "description": "A container representing a design folder or project grouping",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "tags": {
+          "type": "array",
+          "description": "List of tags associated with this Folder"
+        },
+        "artifactRefs": {
+          "type": "array",
+          "description": "Array of references to individual artifacts in folders, optionally containing tags"
+        }
+      },
+      "required": ["id", "userId", "name", "createdAt"]
     }
   },
   "firestore": {
@@ -93,6 +117,10 @@
     "/users/{userId}/savedArtifacts/{artifactId}": {
       "schema": "Artifact",
       "description": "Sub-collection containing user-saved standalone components/artifacts"
+    },
+    "/users/{userId}/folders/{folderId}": {
+      "schema": "Folder",
+      "description": "Sub-collection containing user-created folder and project groups"
     }
   }
 }

@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, GithubAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
@@ -8,6 +8,7 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId); // App will break without correct database ID
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
+export const githubProvider = new GithubAuthProvider();
 
 // Standard Popup Login Flow (preferred in sandboxed iFrames)
 export const loginWithGoogle = async () => {
@@ -16,6 +17,16 @@ export const loginWithGoogle = async () => {
     return result.user;
   } catch (error) {
     console.error("Google authentication failed:", error);
+    throw error;
+  }
+};
+
+export const loginWithGithub = async () => {
+  try {
+    const result = await signInWithPopup(auth, githubProvider);
+    return result.user;
+  } catch (error) {
+    console.error("GitHub authentication failed:", error);
     throw error;
   }
 };

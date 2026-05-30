@@ -28,6 +28,25 @@ export interface Session {
     artifacts: Artifact[];
     attachments?: Attachment[];
     contextUrl?: string;
+    folderId?: string; // Opt folder grouping identifier
+}
+
+export interface FolderRef {
+    sessionId: string;
+    artifactId: string;
+    styleName: string;
+    html: string;
+    timestamp: number;
+    tags?: string[];
+}
+
+export interface Folder {
+    id: string;
+    name: string;
+    createdAt: number;
+    userId?: string;
+    artifactRefs?: FolderRef[];
+    tags?: string[];
 }
 
 export interface ComponentVariation { name: string; html: string; }

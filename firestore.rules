@@ -45,7 +45,18 @@ service cloud.firestore {
         && (data.timestamp is int || data.timestamp is float)
         && data.artifacts is list
         && (!('contextUrl' in data) || data.contextUrl == null || (data.contextUrl is string && data.contextUrl.size() <= 2083))
-        && (!('attachments' in data) || data.attachments is list);
+        && (!('attachments' in data) || data.attachments is list)
+        && (!('folderId' in data) || data.folderId == null || (data.folderId is string && data.folderId.size() <= 128));
+    }
+
+    function isValidFolder(data, userId) {
+      return data.id is string && data.id.size() <= 128
+        && data.userId == userId
+        && data.userId == request.auth.uid
+        && data.name is string && data.name.size() <= 100
+        && (data.createdAt is int || data.createdAt is float)
+        && (!('artifactRefs' in data) || data.artifactRefs is list)
+        && (!('tags' in data) || data.tags is list);
     }
 
     function isValidArtifact(data) {
@@ -79,6 +90,14 @@ service cloud.firestore {
       allow get, delete: if isOwner(userId) && isValidId(artifactId);
       allow create: if isOwner(userId) && isValidId(artifactId) && isValidArtifact(incoming());
       allow update: if isOwner(userId) && isValidId(artifactId) && isValidArtifact(incoming());
+    }
+
+    // 4. Folders/Projects (Grouping)
+    match /users/{userId}/folders/{folderId} {
+      allow list: if isOwner(userId);
+      allow get, delete: if isOwner(userId) && isValidId(folderId);
+      allow create: if isOwner(userId) && isValidId(folderId) && isValidFolder(incoming(), userId);
+      allow update: if isOwner(userId) && isValidId(folderId) && isValidFolder(incoming(), userId);
     }
   }
 }

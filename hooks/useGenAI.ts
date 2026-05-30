@@ -7,8 +7,8 @@
 import { useState, useCallback, useEffect } from 'react';
 import { GoogleGenAI, GenerateContentResponse } from '@google/genai';
 import { generateId, withRetry } from '../utils';
-import { Session, Artifact, ComponentVariation, SuggestedComponent, Attachment } from '../types';
-import { db, auth, loginWithGoogle, logoutUser, handleFirestoreError, OperationType } from '../utils/firebase';
+import { Session, Artifact, ComponentVariation, SuggestedComponent, Attachment, Folder } from '../types';
+import { db, auth, loginWithGoogle, loginWithGithub, logoutUser, handleFirestoreError, OperationType } from '../utils/firebase';
 import { doc, getDoc, setDoc, updateDoc, deleteDoc, getDocs, collection, getDocFromServer } from 'firebase/firestore';
 
 const STORAGE_KEY = 'flash_ui_sessions_v1';
@@ -70,6 +70,37 @@ const saveSessionDoc = async (userId: string, sessionId: string, sessionData: an
     return setDoc(doc(db, 'users', userId, 'sessions', sessionId), sanitizedSession);
 };
 
+const mergeLocalToCloud = async (userId: string) => {
+    try {
+        const localSessionsStr = localStorage.getItem(STORAGE_KEY);
+        if (localSessionsStr) {
+            const localSessions = JSON.parse(localSessionsStr);
+            for (const sess of localSessions) {
+                await saveSessionDoc(userId, sess.id, sess).catch(() => {});
+            }
+            localStorage.removeItem(STORAGE_KEY);
+        }
+        const localSavedStr = localStorage.getItem(SAVED_KEY);
+        if (localSavedStr) {
+            const localSaved = JSON.parse(localSavedStr);
+            for (const art of localSaved) {
+                await setDoc(doc(db, 'users', userId, 'savedArtifacts', art.id), art).catch(() => {});
+            }
+            localStorage.removeItem(SAVED_KEY);
+        }
+        const localFoldersStr = localStorage.getItem('flash_ui_folders_v1');
+        if (localFoldersStr) {
+            const localFolders = JSON.parse(localFoldersStr);
+            for (const f of localFolders) {
+                await setDoc(doc(db, 'users', userId, 'folders', f.id), { ...f, userId }).catch(() => {});
+            }
+            localStorage.removeItem('flash_ui_folders_v1');
+        }
+    } catch (e) {
+        console.warn("Failed to merge local sessions/data to cloud:", e);
+    }
+};
+
 export const useGenAI = () => {
     const [currentUser, setCurrentUser] = useState<any>(null);
     const [authLoading, setAuthLoading] = useState<boolean>(true);
@@ -78,6 +109,7 @@ export const useGenAI = () => {
     const [userApiKey, setUserApiKey] = useState<string>('');
     const [sessions, setSessions] = useState<Session[]>([]);
     const [savedArtifacts, setSavedArtifacts] = useState<Artifact[]>([]);
+    const [folders, setFolders] = useState<Folder[]>([]);
 
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [componentVariations, setComponentVariations] = useState<ComponentVariation[]>([]);
@@ -106,6 +138,9 @@ export const useGenAI = () => {
             if (user) {
                 setAuthLoading(true);
                 try {
+                    // Merge any local sessions/data to cloud first to link the account
+                    await mergeLocalToCloud(user.uid);
+
                     // Load or init user document
                     const userDocRef = doc(db, 'users', user.uid);
                     let userDoc;
@@ -164,6 +199,22 @@ export const useGenAI = () => {
                         loadedSaved.push(docSnap.data() as Artifact);
                     });
                     setSavedArtifacts(loadedSaved);
+
+                    // Load user folders
+                    let foldersSnap;
+                    try {
+                        foldersSnap = await getDocs(collection(db, 'users', user.uid, 'folders'));
+                    } catch (error) {
+                        handleFirestoreError(error, OperationType.LIST, `users/${user.uid}/folders`);
+                        throw error;
+                    }
+
+                    const loadedFolders: Folder[] = [];
+                    foldersSnap.forEach((docSnap) => {
+                        loadedFolders.push(docSnap.data() as Folder);
+                    });
+                    loadedFolders.sort((a, b) => a.createdAt - b.createdAt);
+                    setFolders(loadedFolders);
                 } catch (e) {
                     console.error("Failed to load user data from Firestore:", e);
                 } finally {
@@ -180,6 +231,9 @@ export const useGenAI = () => {
 
                     const localSaved = localStorage.getItem(SAVED_KEY);
                     setSavedArtifacts(localSaved ? JSON.parse(localSaved) : []);
+
+                    const localFolders = localStorage.getItem('flash_ui_folders_v1');
+                    setFolders(localFolders ? JSON.parse(localFolders) : []);
                 } catch (e) {
                     console.warn('Failed to load state from local storage', e);
                 }
@@ -197,6 +251,7 @@ export const useGenAI = () => {
                 if (!auth.currentUser) {
                     localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
                     localStorage.setItem(SAVED_KEY, JSON.stringify(savedArtifacts));
+                    localStorage.setItem('flash_ui_folders_v1', JSON.stringify(folders));
                     if (userApiKey) {
                         localStorage.setItem(API_KEY_STORAGE_KEY, userApiKey);
                     } else {
@@ -215,7 +270,7 @@ export const useGenAI = () => {
         }, 1000);
 
         return () => clearTimeout(handler);
-    }, [sessions, savedArtifacts, userApiKey, currentUser]);
+    }, [sessions, savedArtifacts, folders, userApiKey, currentUser]);
 
     const validateApiKey = useCallback(async (key: string) => {
         if (!key) {
@@ -1111,13 +1166,197 @@ STRICT REQUIREMENTS:
         }
     }, [getAiClient, sessions]);
 
+    const createFolder = useCallback(async (name: string) => {
+        const newFolder: Folder = {
+            id: generateId(),
+            name,
+            createdAt: Date.now(),
+            artifactRefs: []
+        };
+
+        setFolders(prev => {
+            const updated = [...prev, newFolder];
+            const user = auth.currentUser;
+            if (user) {
+                setDoc(doc(db, 'users', user.uid, 'folders', newFolder.id), {
+                    ...newFolder,
+                    userId: user.uid
+                }).catch(err => handleFirestoreError(err, OperationType.CREATE, `users/${user.uid}/folders/${newFolder.id}`));
+            }
+            return updated;
+        });
+        return newFolder.id;
+    }, []);
+
+    const deleteFolder = useCallback(async (folderId: string) => {
+        setFolders(prev => {
+            const updated = prev.filter(f => f.id !== folderId);
+            const user = auth.currentUser;
+            if (user) {
+                deleteDoc(doc(db, 'users', user.uid, 'folders', folderId))
+                    .catch(err => handleFirestoreError(err, OperationType.DELETE, `users/${user.uid}/folders/${folderId}`));
+            }
+            return updated;
+        });
+
+        // Clear associated folderId on sessions
+        setSessions(prev => {
+            const updated = prev.map(s => s.folderId === folderId ? { ...s, folderId: undefined } : s);
+            const user = auth.currentUser;
+            if (user) {
+                prev.forEach(s => {
+                    if (s.folderId === folderId) {
+                        updateDoc(doc(db, 'users', user.uid, 'sessions', s.id), { folderId: null }).catch(() => {});
+                    }
+                });
+            }
+            return updated;
+        });
+    }, []);
+
+    const renameFolder = useCallback(async (folderId: string, name: string) => {
+        setFolders(prev => {
+            const updated = prev.map(f => f.id === folderId ? { ...f, name } : f);
+            const user = auth.currentUser;
+            if (user) {
+                updateDoc(doc(db, 'users', user.uid, 'folders', folderId), { name })
+                    .catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/folders/${folderId}`));
+            }
+            return updated;
+        });
+    }, []);
+
+    const moveSessionToFolder = useCallback(async (sessionId: string, folderId: string | null) => {
+        setSessions(prev => {
+            const updated = prev.map(s => s.id === sessionId ? { ...s, folderId: folderId || undefined } : s);
+            const user = auth.currentUser;
+            if (user) {
+                const matched = updated.find(x => x.id === sessionId);
+                if (matched) {
+                    saveSessionDoc(user.uid, sessionId, matched)
+                        .catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/sessions/${sessionId}`));
+                }
+            }
+            return updated;
+        });
+    }, []);
+
+    const moveArtifactToFolder = useCallback(async (sessionId: string, artifactId: string, folderId: string) => {
+        const session = sessions.find(s => s.id === sessionId);
+        if (!session) return;
+        const artifact = session.artifacts.find(a => a.id === artifactId);
+        if (!artifact) return;
+
+        setFolders(prev => {
+            const updated = prev.map(f => {
+                if (f.id === folderId) {
+                    const exists = f.artifactRefs?.some(ref => ref.sessionId === sessionId && ref.artifactId === artifactId);
+                    if (exists) return f;
+
+                    const newRef = {
+                        sessionId,
+                        artifactId,
+                        styleName: artifact.styleName,
+                        html: artifact.html,
+                        timestamp: Date.now()
+                    };
+                    const artifactRefs = [...(f.artifactRefs || []), newRef];
+                    const updatedFolder = { ...f, artifactRefs };
+
+                    const user = auth.currentUser;
+                    if (user) {
+                        updateDoc(doc(db, 'users', user.uid, 'folders', folderId), { artifactRefs })
+                            .catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/folders/${folderId}`));
+                    }
+                    return updatedFolder;
+                }
+                return f;
+            });
+            return updated;
+        });
+    }, [sessions]);
+
+    const removeArtifactFromFolder = useCallback(async (folderId: string, sessionId: string, artifactId: string) => {
+        setFolders(prev => {
+            const updated = prev.map(f => {
+                if (f.id === folderId) {
+                    const artifactRefs = (f.artifactRefs || []).filter(ref => !(ref.sessionId === sessionId && ref.artifactId === artifactId));
+                    const updatedFolder = { ...f, artifactRefs };
+
+                    const user = auth.currentUser;
+                    if (user) {
+                        updateDoc(doc(db, 'users', user.uid, 'folders', folderId), { artifactRefs })
+                            .catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/folders/${folderId}`));
+                    }
+                    return updatedFolder;
+                }
+                return f;
+            });
+            return updated;
+        });
+    }, []);
+
+    const updateArtifactTags = useCallback(async (folderId: string, sessionId: string, artifactId: string, tags: string[]) => {
+        setFolders(prev => {
+            const updated = prev.map(f => {
+                if (f.id === folderId) {
+                    const artifactRefs = (f.artifactRefs || []).map(ref => {
+                        if (ref.sessionId === sessionId && ref.artifactId === artifactId) {
+                            return { ...ref, tags };
+                        }
+                        return ref;
+                    });
+                    const updatedFolder = { ...f, artifactRefs };
+
+                    const user = auth.currentUser;
+                    if (user) {
+                        updateDoc(doc(db, 'users', user.uid, 'folders', folderId), { artifactRefs })
+                            .catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/folders/${folderId}`));
+                    }
+                    return updatedFolder;
+                }
+                return f;
+            });
+            return updated;
+        });
+    }, []);
+
+    const updateFolderTags = useCallback(async (folderId: string, tags: string[]) => {
+        setFolders(prev => {
+            const updated = prev.map(f => {
+                if (f.id === folderId) {
+                    const updatedFolder = { ...f, tags };
+
+                    const user = auth.currentUser;
+                    if (user) {
+                        updateDoc(doc(db, 'users', user.uid, 'folders', folderId), { tags })
+                            .catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/folders/${folderId}`));
+                    }
+                    return updatedFolder;
+                }
+                return f;
+            });
+            return updated;
+        });
+    }, []);
+
     return {
         currentUser,
         authLoading,
         loginWithGoogle,
+        loginWithGithub,
         logoutUser,
         sessions,
         savedArtifacts,
+        folders,
+        createFolder,
+        deleteFolder,
+        renameFolder,
+        moveSessionToFolder,
+        moveArtifactToFolder,
+        removeArtifactFromFolder,
+        updateArtifactTags,
+        updateFolderTags,
         userApiKey,
         setUserApiKey,
         validateApiKey,
