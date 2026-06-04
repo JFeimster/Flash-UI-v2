@@ -20,6 +20,7 @@ interface ProjectFoldersModalProps {
     removeArtifactFromFolder: (folderId: string, sessionId: string, artifactId: string) => void;
     updateArtifactTags: (folderId: string, sessionId: string, artifactId: string, tags: string[]) => void;
     updateFolderTags: (folderId: string, tags: string[]) => void;
+    reorderFolders: (reorderedFolders: Folder[]) => void;
     onViewArtifact: (html: string, styleName: string) => void;
 }
 
@@ -37,6 +38,7 @@ export default function ProjectFoldersModal({
     removeArtifactFromFolder,
     updateArtifactTags,
     updateFolderTags,
+    reorderFolders,
     onViewArtifact
 }: ProjectFoldersModalProps) {
     const [selectedFolderId, setSelectedFolderId] = useState<string | null>(
@@ -46,6 +48,10 @@ export default function ProjectFoldersModal({
     const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
     const [editingName, setEditingName] = useState('');
     const [copiedId, setCopiedId] = useState<string | null>(null);
+
+    // Drag-and-Drop States
+    const [draggedFolder, setDraggedFolder] = useState<Folder | null>(null);
+    const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
 
     // List of all artifacts in sessions that are NOT already in the active folder
     const [selectedSourceSessionId, setSelectedSourceSessionId] = useState('');
@@ -144,6 +150,54 @@ export default function ProjectFoldersModal({
         }
     };
 
+    const handleExportCSV = () => {
+        if (!activeFolder || !activeFolder.artifactRefs || activeFolder.artifactRefs.length === 0) return;
+
+        // Header row
+        const headers = ["Folder Name", "Artifact ID", "Session ID", "Style Name", "Tags", "Linked Time", "File Size (Characters)"];
+        
+        // Data rows
+        const rows = activeFolder.artifactRefs.map(ref => {
+            const folderName = activeFolder.name;
+            const artifactId = ref.artifactId;
+            const sessionId = ref.sessionId;
+            const styleName = ref.styleName;
+            const tags = (ref.tags || []).join('; ');
+            const linkedTime = new Date(ref.timestamp || Date.now()).toISOString();
+            const charLength = ref.html?.length || 0;
+
+            const escapeCSVCell = (val: string | number) => {
+                const str = String(val);
+                if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                    return `"${str.replace(/"/g, '""')}"`;
+                }
+                return str;
+            };
+
+            return [
+                escapeCSVCell(folderName),
+                escapeCSVCell(artifactId),
+                escapeCSVCell(sessionId),
+                escapeCSVCell(styleName),
+                escapeCSVCell(tags),
+                escapeCSVCell(linkedTime),
+                escapeCSVCell(charLength)
+            ].join(',');
+        });
+
+        const csvContent = [headers.join(','), ...rows].join('\n');
+        
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `${activeFolder.name.trim().replace(/\s+/g, '_').toLowerCase()}_artifacts.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     // Filtered Refs
     const filteredRefs = activeFolder?.artifactRefs?.filter(ref => {
         if (!filterTag) return true;
@@ -213,15 +267,66 @@ export default function ProjectFoldersModal({
                                 folders.map(folder => {
                                     const isActive = activeFolder?.id === folder.id;
                                     const isEditing = editingFolderId === folder.id;
+                                    const isDragOver = dragOverFolderId === folder.id;
 
                                     return (
                                         <div 
                                             key={folder.id}
                                             onClick={() => !isEditing && setSelectedFolderId(folder.id)}
-                                            className={`group relative flex flex-col p-3 rounded-lg border transition-all cursor-pointer ${
-                                                isActive 
-                                                    ? 'bg-gradient-to-r from-indigo-950/30 to-slate-900/40 border-indigo-500/30 text-white shadow-md' 
-                                                    : 'bg-white/[0.02] border-white/5 text-stone-400 hover:text-stone-200 hover:border-white/10'
+                                            draggable={!isEditing}
+                                            onDragStart={(e) => {
+                                                e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'folder', id: folder.id }));
+                                                e.dataTransfer.effectAllowed = 'move';
+                                                setDraggedFolder(folder);
+                                            }}
+                                            onDragOver={(e) => {
+                                                e.preventDefault();
+                                                setDragOverFolderId(folder.id);
+                                            }}
+                                            onDragLeave={() => {
+                                                setDragOverFolderId(null);
+                                            }}
+                                            onDrop={(e) => {
+                                                e.preventDefault();
+                                                const dataStr = e.dataTransfer.getData('text/plain');
+                                                if (dataStr) {
+                                                    try {
+                                                        const data = JSON.parse(dataStr);
+                                                        if (data.type === 'folder') {
+                                                            const sourceId = data.id;
+                                                            const targetId = folder.id;
+                                                            if (sourceId !== targetId) {
+                                                                const sourceIndex = folders.findIndex(f => f.id === sourceId);
+                                                                const targetIndex = folders.findIndex(f => f.id === targetId);
+                                                                if (sourceIndex !== -1 && targetIndex !== -1) {
+                                                                    const nextFolders = [...folders];
+                                                                    const [removed] = nextFolders.splice(sourceIndex, 1);
+                                                                    nextFolders.splice(targetIndex, 0, removed);
+                                                                    reorderFolders(nextFolders);
+                                                                }
+                                                            }
+                                                        } else if (data.type === 'artifact') {
+                                                            const { sessionId, artifactId, sourceFolderId } = data;
+                                                            if (sourceFolderId !== folder.id) {
+                                                                moveArtifactToFolder(sessionId, artifactId, folder.id);
+                                                                if (sourceFolderId) {
+                                                                    removeArtifactFromFolder(sourceFolderId, sessionId, artifactId);
+                                                                }
+                                                            }
+                                                        }
+                                                    } catch (err) {
+                                                        console.error("Drop error", err);
+                                                    }
+                                                }
+                                                setDraggedFolder(null);
+                                                setDragOverFolderId(null);
+                                            }}
+                                            className={`group relative flex flex-col p-3 rounded-lg border transition-all duration-200 cursor-pointer ${
+                                                isDragOver
+                                                    ? 'bg-indigo-500/20 border-indigo-400 scale-[1.02] shadow-[0_0_12px_rgba(99,102,241,0.2)]'
+                                                    : isActive 
+                                                        ? 'bg-gradient-to-r from-indigo-950/30 to-slate-900/40 border-indigo-500/30 text-white shadow-md' 
+                                                        : 'bg-white/[0.02] border-white/5 text-stone-400 hover:text-stone-200 hover:border-white/10'
                                             }`}
                                         >
                                             {isEditing ? (
@@ -323,6 +428,18 @@ export default function ProjectFoldersModal({
                                                         <Download className="w-3 h-3" />
                                                     )}
                                                     <span>{isExportingZip ? 'Packaging...' : 'Download ZIP'}</span>
+                                                </button>
+                                            )}
+
+                                            {/* Folder CSV Export Button */}
+                                            {activeFolder.artifactRefs && activeFolder.artifactRefs.length > 0 && (
+                                                <button
+                                                    onClick={handleExportCSV}
+                                                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[9px] font-bold font-mono uppercase tracking-wide rounded hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer shadow-md shadow-emerald-950/40"
+                                                    title="Export folder design references and tags data into an easy-to-analyze CSV file"
+                                                >
+                                                    <Download className="w-3 h-3" />
+                                                    <span>Export CSV</span>
                                                 </button>
                                             )}
                                         </div>
@@ -491,14 +608,38 @@ export default function ProjectFoldersModal({
                                                 ? Object.keys(resolvedArtifact.additionalFiles).length 
                                                 : 0;
 
-                                            return (
+                                             return (
                                                 <div 
                                                     key={uniqueRefId}
-                                                    className="relative group flex flex-col bg-[#0e1017] border border-white/5 rounded-xl overflow-hidden p-3 hover:border-white/10 transition-all hover:shadow-indigo-950/10 shadow-lg"
+                                                    draggable={true}
+                                                    onDragStart={(e) => {
+                                                        e.dataTransfer.setData('text/plain', JSON.stringify({ 
+                                                            type: 'artifact', 
+                                                            sessionId: ref.sessionId, 
+                                                            artifactId: ref.artifactId, 
+                                                            sourceFolderId: activeFolder.id 
+                                                        }));
+                                                        e.dataTransfer.effectAllowed = 'move';
+                                                        e.currentTarget.style.opacity = '0.5';
+                                                    }}
+                                                    onDragEnd={(e) => {
+                                                        e.currentTarget.style.opacity = '1';
+                                                    }}
+                                                    className="relative group flex flex-col bg-[#0e1017] border border-white/5 rounded-xl overflow-hidden p-3 hover:border-white/10 transition-all hover:shadow-indigo-950/10 shadow-lg cursor-grab active:cursor-grabbing"
                                                 >
                                                     {/* Header Style Metadata */}
                                                     <div className="flex items-center justify-between pb-2 border-b border-white/5">
                                                         <div className="flex items-center gap-1.5 flex-wrap">
+                                                            <div className="p-0.5 bg-white/5 rounded text-stone-500 hover:text-stone-350 cursor-grab active:cursor-grabbing mr-0.5 flex items-center justify-center" title="Drag and drop this card into another folder in the left sidebar">
+                                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 text-stone-500">
+                                                                    <circle cx="9" cy="5" r="1.5" fill="currentColor" />
+                                                                    <circle cx="9" cy="12" r="1.5" fill="currentColor" />
+                                                                    <circle cx="9" cy="19" r="1.5" fill="currentColor" />
+                                                                    <circle cx="15" cy="5" r="1.5" fill="currentColor" />
+                                                                    <circle cx="15" cy="12" r="1.5" fill="currentColor" />
+                                                                    <circle cx="15" cy="19" r="1.5" fill="currentColor" />
+                                                                </svg>
+                                                            </div>
                                                             <span className="px-2 py-0.5 bg-indigo-500/10 text-indigo-400 text-[10px] font-mono leading-none rounded font-semibold">
                                                                 {ref.styleName}
                                                             </span>

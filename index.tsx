@@ -135,8 +135,11 @@ function App() {
     moveArtifactToFolder,
     removeArtifactFromFolder,
     updateArtifactTags,
-    updateFolderTags
+    updateFolderTags,
+    reorderFolders
   } = useGenAI();
+
+  const isGithubConnected = currentUser?.providerData?.some((p: any) => p.providerId === 'github.com' || p.providerId === 'github') || false;
 
   const {
       currentSessionIndex,
@@ -437,6 +440,12 @@ function App() {
                             <HomeIcon />
                         </button>
                     )}
+
+                    {/* GitHub Real-time Connection Indicator */}
+                    <div className="flex items-center gap-1.5 px-2 py-1 bg-white/[0.03] border border-white/5 rounded-full select-none" title={`GitHub Connection Status: ${isGithubConnected ? 'Connected' : 'Offline'}`}>
+                        <span className={`w-2 h-2 rounded-full ${isGithubConnected ? 'bg-[#34d399] shadow-[0_0_8px_#10b981]' : 'bg-[#ef4444] shadow-[0_0_8px_#ef4444] animate-pulse'}`} />
+                        <span className="text-[9px] font-mono font-semibold tracking-wider text-stone-400">GH Sync</span>
+                    </div>
 
                     {/* Firebase Authentication Sync Controls */}
                     <div className="flex items-center gap-2 border-l border-white/10 pl-3 ml-2">
@@ -831,6 +840,7 @@ function App() {
             removeArtifactFromFolder={removeArtifactFromFolder}
             updateArtifactTags={updateArtifactTags}
             updateFolderTags={updateFolderTags}
+            reorderFolders={reorderFolders}
             onViewArtifact={(html, styleName) => {
                 const sIdx = sessions.findIndex(s => s.artifacts.some(a => a.html === html));
                 if (sIdx !== -1) {

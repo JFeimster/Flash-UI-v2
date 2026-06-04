@@ -1340,6 +1340,26 @@ STRICT REQUIREMENTS:
         });
     }, []);
 
+    const reorderFolders = useCallback(async (reorderedFolders: Folder[]) => {
+        const baseTime = Date.now() - reorderedFolders.length * 1000;
+        const updated = reorderedFolders.map((f, index) => ({
+            ...f,
+            createdAt: baseTime + index * 1000
+        }));
+
+        setFolders(updated);
+
+        const user = auth.currentUser;
+        if (user) {
+            for (const folder of updated) {
+                updateDoc(doc(db, 'users', user.uid, 'folders', folder.id), { createdAt: folder.createdAt })
+                    .catch(err => {
+                        console.error("Failed to persist reordered folder:", err);
+                    });
+            }
+        }
+    }, []);
+
     return {
         currentUser,
         authLoading,
@@ -1357,6 +1377,7 @@ STRICT REQUIREMENTS:
         removeArtifactFromFolder,
         updateArtifactTags,
         updateFolderTags,
+        reorderFolders,
         userApiKey,
         setUserApiKey,
         validateApiKey,
