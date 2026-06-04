@@ -279,15 +279,27 @@ export const useGenAI = () => {
         }
 
         try {
-            const ai = new GoogleGenAI({ apiKey: key });
-            
-            // Simple validation call using the SDK's existing pattern
-            const result = await ai.models.generateContent({
-                model: 'gemini-3.5-flash',
-                contents: [{ parts: [{ text: 'ping' }], role: 'user' }]
-            }) as GenerateContentResponse;
+            const response = await fetch('/api/gemini/call', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'x-gemini-api-key': key
+                },
+                body: JSON.stringify({
+                    method: 'generateContent',
+                    model: 'gemini-3.5-flash',
+                    contents: [{ parts: [{ text: 'ping' }], role: 'user' }]
+                })
+            });
 
-            if (result) {
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData.error || `Server returned status ${response.status}`);
+            }
+
+            const result = await response.json();
+
+            if (result && result.text) {
                 setApiKeyStatus({ 
                     isValid: true, 
                     error: null,
@@ -303,9 +315,78 @@ export const useGenAI = () => {
     }, []);
 
     const getAiClient = useCallback(() => {
-        const key = userApiKey || process.env.API_KEY || (process.env as any).GEMINI_API_KEY;
-        if (!key) throw new Error("No Gemini API key found. Please configure one in AI Tools.");
-        return new GoogleGenAI({ apiKey: key });
+        return {
+            models: {
+                generateContent: async (params: any) => {
+                    const response = await fetch('/api/gemini/call', {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            ...(userApiKey ? { 'x-gemini-api-key': userApiKey } : {})
+                        },
+                        body: JSON.stringify({
+                            method: 'generateContent',
+                            model: params.model,
+                            contents: params.contents,
+                            config: params.config
+                        })
+                    });
+                    if (!response.ok) {
+                        const errData = await response.json().catch(() => ({}));
+                        throw new Error(errData.error || `Server returned status ${response.status}`);
+                    }
+                    return await response.json();
+                },
+                generateContentStream: async function* (params: any) {
+                    const response = await fetch('/api/gemini/call', {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            ...(userApiKey ? { 'x-gemini-api-key': userApiKey } : {})
+                        },
+                        body: JSON.stringify({
+                            method: 'generateContentStream',
+                            model: params.model,
+                            contents: params.contents,
+                            config: params.config
+                        })
+                    });
+                    if (!response.ok) {
+                        const errData = await response.json().catch(() => ({}));
+                        throw new Error(errData.error || `Server returned status ${response.status}`);
+                    }
+                    
+                    const reader = response.body?.getReader();
+                    const decoder = new TextDecoder();
+                    if (!reader) return;
+                    
+                    let buffer = '';
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        
+                        buffer += decoder.decode(value, { stream: true });
+                        const lines = buffer.split('\n');
+                        buffer = lines.pop() || '';
+                        
+                        for (const line of lines) {
+                            if (line.startsWith('data: ')) {
+                                const dataStr = line.slice(6).trim();
+                                if (dataStr === '[DONE]') {
+                                    return;
+                                }
+                                try {
+                                    const parsed = JSON.parse(dataStr);
+                                    yield parsed;
+                                } catch (e) {
+                                    // Parse error or incomplete chunk
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } as any;
     }, [userApiKey]);
 
     const parseJsonStream = async function* (responseStream: any) {

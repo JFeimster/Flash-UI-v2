@@ -217,6 +217,62 @@ async function startServer() {
 
   // === Custom APIs ===
 
+  // === Gemini API Server Proxy ====
+  app.post("/api/gemini/call", async (req, res) => {
+    const { method, model, contents, config } = req.body;
+    
+    // Support custom user API key passed from headers (via settings UI)
+    // or fallback to the server config's GEMINI_API_KEY or API_KEY
+    const customHeaderKey = req.headers['x-gemini-api-key'];
+    const apiKey = (typeof customHeaderKey === 'string' && customHeaderKey) 
+      ? customHeaderKey 
+      : (process.env.GEMINI_API_KEY || process.env.API_KEY);
+
+    if (!apiKey) {
+      return res.status(401).json({ 
+        error: "No Gemini API key available. Please configure your API key in settings or server environment." 
+      });
+    }
+
+    try {
+      const ai = new GoogleGenAI({ apiKey });
+      const targetModel = model || "gemini-3.5-flash";
+
+      if (method === "generateContent") {
+        const response = await ai.models.generateContent({
+          model: targetModel,
+          contents,
+          config
+        });
+        return res.json({ text: response.text });
+      } else if (method === "generateContentStream") {
+        const responseStream = await ai.models.generateContentStream({
+          model: targetModel,
+          contents,
+          config
+        });
+
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+
+        for await (const chunk of responseStream) {
+          const text = chunk.text || '';
+          res.write(`data: ${JSON.stringify({ text })}\n\n`);
+        }
+        res.write('data: [DONE]\n\n');
+        res.end();
+      } else {
+        res.status(400).json({ error: `Unsupported method: ${method}` });
+      }
+    } catch (error: any) {
+      console.error("Gemini Proxy Error:", error);
+      res.status(500).json({ 
+        error: error.message || "Failed to make Gemini API call" 
+      });
+    }
+  });
+
   // Example API: Health Check
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });

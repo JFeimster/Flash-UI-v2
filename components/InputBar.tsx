@@ -5,7 +5,6 @@
 */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { GoogleGenAI } from '@google/genai';
 import { LayoutIcon, ThinkingIcon, ArrowUpIcon, AttachmentIcon, XIcon, SparklesIcon, MagicWandIcon } from './Icons';
 import { INITIAL_PLACEHOLDERS } from '../constants';
 import { SuggestedComponent, Attachment } from '../types';
@@ -68,19 +67,24 @@ export default function InputBar({
     useEffect(() => {
         const fetchDynamicPlaceholders = async () => {
             try {
-                const apiKey = process.env.API_KEY;
-                if (!apiKey) return;
-                const ai = new GoogleGenAI({ apiKey });
-                const response = await ai.models.generateContent({
-                    model: 'gemini-3.5-flash',
-                    contents: { 
-                        role: 'user', 
-                        parts: [{ 
-                            text: 'Generate 20 creative, short, diverse UI component prompts (e.g. "bioluminescent task list"). Return ONLY a raw JSON array of strings. IP SAFEGUARD: Avoid referencing specific famous artists, movies, or brands.' 
-                        }] 
-                    }
+                const response = await fetch('/api/gemini/call', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        method: 'generateContent',
+                        model: 'gemini-3.5-flash',
+                        contents: [{ 
+                            role: 'user', 
+                            parts: [{ 
+                                text: 'Generate 20 creative, short, diverse UI component prompts (e.g. "bioluminescent task list"). Return ONLY a raw JSON array of strings. IP SAFEGUARD: Avoid referencing specific famous artists, movies, or brands.' 
+                            }] 
+                        }]
+                    })
                 });
-                const text = response.text || '[]';
+
+                if (!response.ok) return;
+                const data = await response.json();
+                const text = data.text || '[]';
                 const jsonMatch = text.match(/\[[\s\S]*\]/);
                 if (jsonMatch) {
                     const newPlaceholders = JSON.parse(jsonMatch[0]);

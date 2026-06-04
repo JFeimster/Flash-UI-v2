@@ -139,7 +139,29 @@ function App() {
     reorderFolders
   } = useGenAI();
 
-  const isGithubConnected = currentUser?.providerData?.some((p: any) => p.providerId === 'github.com' || p.providerId === 'github') || false;
+  const [cookieGithubConnected, setCookieGithubConnected] = useState(false);
+  useEffect(() => {
+    const checkStatus = async () => {
+      try {
+        const res = await fetch('/api/github/status');
+        const data = await res.json().catch(() => ({}));
+        setCookieGithubConnected(!!data.connected);
+      } catch (e) {
+        console.error("Failed to check github status", e);
+      }
+    };
+    checkStatus();
+    
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'OAUTH_AUTH_SUCCESS' && event.data?.provider === 'github') {
+        setCookieGithubConnected(true);
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
+  const isGithubConnected = currentUser?.providerData?.some((p: any) => p.providerId === 'github.com' || p.providerId === 'github') || cookieGithubConnected;
 
   const {
       currentSessionIndex,
