@@ -113,6 +113,7 @@ export const useGenAI = () => {
 
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [componentVariations, setComponentVariations] = useState<ComponentVariation[]>([]);
+    const [generationError, setGenerationError] = useState<string | null>(null);
 
     const [apiKeyStatus, setApiKeyStatus] = useState<{
         isValid: boolean | null;
@@ -479,6 +480,7 @@ Required JSON Output Format (stream ONE object per line):
         if (!trimmedInput && attachments.length === 0 && !contextUrl) return;
 
         setIsLoading(true);
+        setGenerationError(null);
         
         const baseTime = Date.now();
         const sessionId = generateId();
@@ -527,19 +529,22 @@ Required JSON Output Format (stream ONE object per line):
         try {
             const ai = getAiClient();
 
-            const stylePrompt = `Based on this request: "${trimmedInput || 'UI from attachments'}", suggest 3 distinct visual names/styles. Return ONLY a JSON array of strings. e.g. ["Cyber Grid", "Glass Echo", "Paper Grain"]. No trademarks.`;
-
-            // Wrap style generation with retry logic
-            const styleResponse = await withRetry(() => ai.models.generateContent({
-                model: 'gemini-3.5-flash',
-                contents: { role: 'user', parts: [{ text: stylePrompt }] }
-            })) as GenerateContentResponse;
-
             let generatedStyles: string[] = ["Dynamic Edge", "Core Flow", "Prism Logic"];
             try {
+                const stylePrompt = `Based on this request: "${trimmedInput || 'UI from attachments'}", suggest 3 distinct visual names/styles. Return ONLY a JSON array of strings. e.g. ["Cyber Grid", "Glass Echo", "Paper Grain"]. No trademarks.`;
+
+                // Wrap style generation with retry logic
+                const styleResponse = await withRetry(() => ai.models.generateContent({
+                    model: 'gemini-3.5-flash',
+                    contents: { role: 'user', parts: [{ text: stylePrompt }] }
+                })) as GenerateContentResponse;
+
                 const match = styleResponse.text?.match(/\[.*\]/);
                 if (match) generatedStyles = JSON.parse(match[0]);
-            } catch (e) {}
+            } catch (styleErr: any) {
+                console.warn("Style generation failed, using defaults:", styleErr);
+                setGenerationError(styleErr.message || String(styleErr));
+            }
 
             setSessions(prev => {
                 const updated = prev.map(s => s.id === sessionId ? {
@@ -630,8 +635,9 @@ STRICT REQUIREMENTS:
                         }
                         return updated;
                     });
-                } catch (e) {
+                } catch (e: any) {
                     console.error(`Artifact generation failed for ${artifact.id}:`, e);
+                    setGenerationError(e.message || String(e));
                     setSessions(prev => {
                         const updated = prev.map(sess => sess.id === sessionId ? {
                             ...sess,
@@ -652,8 +658,9 @@ STRICT REQUIREMENTS:
 
             await Promise.all(placeholderArtifacts.map((art, i) => generateArtifact(art, generatedStyles[i])));
 
-        } catch (e) {
+        } catch (e: any) {
             console.error("Session generation failed:", e);
+            setGenerationError(e.message || String(e));
         } finally {
             setIsLoading(false);
         }
@@ -1116,6 +1123,7 @@ Return ONLY a JSON array of objects with the following structure:
         if (!session || !artifact) return;
 
         setIsLoading(true);
+        setGenerationError(null);
 
         const user = auth.currentUser;
 
@@ -1225,8 +1233,9 @@ STRICT REQUIREMENTS:
                 return updated;
             });
 
-        } catch (e) {
+        } catch (e: any) {
             console.error("Revision failed:", e);
+            setGenerationError(e.message || String(e));
             setSessions(prev => {
                 const updated = prev.map(sess => sess.id === sessionId ? {
                     ...sess,
@@ -1465,6 +1474,8 @@ STRICT REQUIREMENTS:
         apiKeyStatus,
         isLoading,
         componentVariations,
+        generationError,
+        setGenerationError,
         sendMessage,
         reviseArtifact,
         generateVariations,

@@ -108,6 +108,8 @@ function App() {
     apiKeyStatus,
     isLoading, 
     componentVariations, 
+    generationError,
+    setGenerationError,
     sendMessage, 
     reviseArtifact,
     generateVariations, 
@@ -355,6 +357,20 @@ function App() {
               } 
           });
       }
+  }, [currentSession, focusedArtifactIndex]);
+
+  const handleOpenApiConfig = useCallback(() => {
+      setDrawerState({
+          isOpen: true,
+          mode: 'ai-tools',
+          title: 'AI Magic Tools',
+          data: currentSession && focusedArtifactIndex !== null ? {
+              html: currentSession.artifacts[focusedArtifactIndex].html, 
+              prompt: currentSession.prompt,
+              sessionId: currentSession.id,
+              artifactId: currentSession.artifacts[focusedArtifactIndex].id
+          } : null
+      });
   }, [currentSession, focusedArtifactIndex]);
 
   const handleTemplateClick = useCallback((prompt: string) => {
@@ -776,6 +792,60 @@ function App() {
                 >
                     <MagicWandIcon /> <span>✎ Edit / Revise Prompt</span>
                 </button>
+            )}
+
+            {generationError && (
+                <div className="mx-auto w-full max-w-2xl px-6 mb-4 z-[999]" style={{ pointerEvents: 'auto' }}>
+                    <div className="bg-[#18181b]/95 border border-red-500/30 shadow-[0_0_20px_rgba(239,68,68,0.15)] rounded-xl p-4 flex flex-col sm:flex-row items-start gap-4 backdrop-blur-md">
+                        <div className="p-2 bg-red-500/10 rounded-lg text-red-400 shrink-0">
+                            <span className="text-xl">⚠️</span>
+                        </div>
+                        <div className="flex-1 space-y-1.5">
+                            <h4 className="text-sm font-semibold text-white tracking-wide flex items-center gap-2">
+                                Gemini Service Alert
+                            </h4>
+                            <p className="text-xs text-stone-400 leading-relaxed font-sans">
+                                {(() => {
+                                    const lowerErr = generationError.toLowerCase();
+                                    if (
+                                        lowerErr.includes("dunning") || 
+                                        lowerErr.includes("403") || 
+                                        lowerErr.includes("permission_denied") || 
+                                        lowerErr.includes("deny") || 
+                                        lowerErr.includes("limit") || 
+                                        lowerErr.includes("key")
+                                    ) {
+                                        return (
+                                            <span>
+                                                The development server's default Google Gemini credentials have reached a Google Cloud project billing limit (Dunning Decision). To instantly bypass this and enjoy unlimited generations and custom UI exports, please configure your own personal Google Gemini API Key in the settings.
+                                            </span>
+                                        );
+                                    }
+                                    return (
+                                        <span>
+                                            Error details: {generationError}
+                                        </span>
+                                    );
+                                })()}
+                            </p>
+                            <div className="pt-2 flex items-center gap-3">
+                                <button
+                                    onClick={handleOpenApiConfig}
+                                    className="text-[11px] font-medium tracking-wider text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 hover:bg-emerald-500/20 px-3 py-1.5 rounded-md transition-all uppercase cursor-pointer"
+                                    style={{ borderStyle: 'solid', borderWidth: '1px' }}
+                                >
+                                    🔑 Configure Gemini Key
+                                </button>
+                                <button
+                                    onClick={() => setGenerationError(null)}
+                                    className="text-[11px] font-medium tracking-wider text-stone-400 hover:text-white hover:bg-white/5 px-2.5 py-1.5 rounded-md transition-all uppercase cursor-pointer"
+                                >
+                                    Dismiss
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             )}
 
             <InputBar 

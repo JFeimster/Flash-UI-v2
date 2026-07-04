@@ -267,8 +267,12 @@ async function startServer() {
       }
     } catch (error: any) {
       console.error("Gemini Proxy Error:", error);
+      let errMsg = error.message || "Failed to make Gemini API call";
+      if (errMsg.includes("dunning") || errMsg.includes("403") || errMsg.includes("PERMISSION_DENIED") || errMsg.includes("deny for project")) {
+        errMsg = "Gemini Key Limit: The default development credentials have reached their Google Cloud project-specific limit. You can bypass this instantly and permanently by entering your own personal Google Gemini API Key in the settings panel!";
+      }
       res.status(500).json({ 
-        error: error.message || "Failed to make Gemini API call" 
+        error: errMsg 
       });
     }
   });
