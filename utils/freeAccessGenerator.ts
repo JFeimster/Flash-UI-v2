@@ -250,64 +250,309 @@ export async function streamFreeAccessContent(
  * custom SVG icons, interactive buttons, tabs, live state, and responsive layout.
  */
 export function generateRichComponentHtml(userRequest: string, styleInspiration: string): string {
-  const cleanTitle = userRequest.length > 50 ? userRequest.substring(0, 50) + "..." : userRequest;
+  const cleanTitle = userRequest.length > 55 ? userRequest.substring(0, 55) + "..." : userRequest;
+  
+  const isLandingPage = /landing\s*page|saas|marketing|hero|startup/i.test(userRequest);
+  const isDashboard = /dashboard|analytics|telemetry|monitor|metrics/i.test(userRequest);
+  const isPortfolio = /portfolio|showcase|agency|case\s*study|designer|photographer/i.test(userRequest);
+  const isEcommerce = /ecommerce|e-commerce|store|product|shop|cart|checkout/i.test(userRequest);
+  const isEmbedWidget = /embed|widget|calculator|converter|mini-tool/i.test(userRequest);
+  const isAuth = /auth|login|signup|signin|split-screen/i.test(userRequest);
+  const isDocs = /documentation|docs|api\s*reference/i.test(userRequest);
   const isAudio = /music|audio|sound|player|track|synth|podcast/i.test(userRequest);
   const isFinance = /payroll|crypto|bitcoin|trade|finance|wallet|cash|bank|stock|invoice/i.test(userRequest);
-  const isTask = /task|todo|kanban|board|project|planner|check/i.test(userRequest);
-  const isWeather = /weather|climate|forecast|temp|radar/i.test(userRequest);
+
+  const isNeobrutalist = /neobrutal|brutalist/i.test(styleInspiration) || /neobrutal/i.test(userRequest);
+  const isCyberpunk = /cyberpunk|neon|hud/i.test(styleInspiration) || /cyberpunk/i.test(userRequest);
+  const isBioluminescent = /bioluminescent|deep-sea/i.test(styleInspiration) || /bioluminescent/i.test(userRequest);
+  const isRetroCrt = /retro|crt|vintage/i.test(styleInspiration) || /retro/i.test(userRequest);
+  const isFuturistic = /futuristic/i.test(styleInspiration) || /futuristic/i.test(userRequest);
+
+  // Styling theme tokens
+  let themeBg = "bg-zinc-950";
+  let cardBg = "bg-zinc-900/90";
+  let borderStyle = "border border-white/10";
+  let textAccent = "text-emerald-400";
+  let buttonPrimary = "bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold shadow-lg shadow-emerald-500/20";
+  let tagStyle = "bg-white/5 border border-white/10 text-emerald-400";
+  let shadowStyle = "shadow-2xl";
+
+  if (isNeobrutalist) {
+    themeBg = "bg-[#f4f0ea] text-zinc-900";
+    cardBg = "bg-white text-zinc-900";
+    borderStyle = "border-2 border-black";
+    textAccent = "text-black font-black";
+    buttonPrimary = "bg-[#ffea00] hover:bg-[#ffe100] text-black font-extrabold border-2 border-black shadow-[4px_4px_0px_0px_#000]";
+    tagStyle = "bg-[#a3e635] text-black border-2 border-black font-extrabold shadow-[2px_2px_0px_0px_#000]";
+    shadowStyle = "shadow-[8px_8px_0px_0px_#000]";
+  } else if (isCyberpunk) {
+    themeBg = "bg-[#06070d] text-cyan-100";
+    cardBg = "bg-[#0c0e1a]/95 text-cyan-50";
+    borderStyle = "border border-cyan-500/30";
+    textAccent = "text-cyan-400 font-mono";
+    buttonPrimary = "bg-cyan-500 hover:bg-cyan-400 text-black font-bold shadow-lg shadow-cyan-500/30 font-mono tracking-wider";
+    tagStyle = "bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 font-mono";
+    shadowStyle = "shadow-[0_0_35px_rgba(6,182,212,0.15)]";
+  } else if (isBioluminescent) {
+    themeBg = "bg-[#020b14] text-teal-100";
+    cardBg = "bg-[#051524]/90 text-teal-50";
+    borderStyle = "border border-teal-500/25";
+    textAccent = "text-teal-300";
+    buttonPrimary = "bg-gradient-to-r from-teal-400 to-cyan-400 text-slate-950 font-bold shadow-lg shadow-teal-500/25";
+    tagStyle = "bg-teal-500/10 border border-teal-500/20 text-teal-300";
+    shadowStyle = "shadow-[0_0_40px_rgba(20,184,166,0.15)]";
+  } else if (isRetroCrt) {
+    themeBg = "bg-[#0f0a02] text-amber-100";
+    cardBg = "bg-[#181104]/95 text-amber-50";
+    borderStyle = "border border-amber-500/30";
+    textAccent = "text-amber-400 font-mono";
+    buttonPrimary = "bg-amber-500 hover:bg-amber-400 text-black font-bold font-mono shadow-lg shadow-amber-500/20";
+    tagStyle = "bg-amber-500/10 border border-amber-500/25 text-amber-400 font-mono";
+    shadowStyle = "shadow-[0_0_30px_rgba(245,158,11,0.15)]";
+  } else if (isFuturistic) {
+    themeBg = "bg-black text-white";
+    cardBg = "bg-zinc-950/90 text-zinc-100";
+    borderStyle = "border border-white/15";
+    textAccent = "text-white";
+    buttonPrimary = "bg-white hover:bg-zinc-200 text-black font-bold shadow-lg";
+    tagStyle = "bg-white/10 border border-white/20 text-white";
+    shadowStyle = "shadow-2xl";
+  }
 
   let specificUiContent = "";
 
-  if (isAudio) {
+  if (isLandingPage) {
     specificUiContent = `
-      <!-- Audio Waveform & Player -->
-      <div class="bg-black/40 rounded-2xl p-6 border border-white/10 mb-6 backdrop-blur-md">
-        <div class="flex items-center gap-4 mb-5">
-          <div class="w-14 h-14 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-500 flex items-center justify-center text-white shadow-lg shadow-violet-500/20">
-            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/></svg>
+      <!-- SaaS & Product Landing Page -->
+      <div class="space-y-6">
+        <!-- Hero Section -->
+        <div class="text-center py-6 border-b ${isNeobrutalist ? 'border-black' : 'border-white/10'}">
+          <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono ${tagStyle} mb-3 font-semibold">
+            ✨ Next-Gen Product Release v2.4
+          </span>
+          <h1 class="text-2xl sm:text-4xl font-extrabold tracking-tight mb-3">
+            Build Intelligent Workflows at the Speed of Thought
+          </h1>
+          <p class="text-xs sm:text-sm ${isNeobrutalist ? 'text-zinc-700' : 'text-stone-400'} max-w-lg mx-auto mb-6">
+            Autonomous agent orchestration, sub-second telemetry, and full-stack component generation in one unified workspace.
+          </p>
+          <div class="flex flex-wrap items-center justify-center gap-3">
+            <button onclick="handleAction('Start Free Trial')" class="px-5 py-2.5 rounded-xl text-xs uppercase tracking-wider transition-all cursor-pointer ${buttonPrimary}">
+              Start Free 14-Day Trial &rarr;
+            </button>
+            <button onclick="handleAction('Schedule Demo')" class="px-5 py-2.5 rounded-xl text-xs font-semibold ${isNeobrutalist ? 'bg-white border-2 border-black hover:bg-zinc-100 shadow-[3px_3px_0px_#000]' : 'bg-white/5 border border-white/15 hover:bg-white/10 text-stone-200'} transition-all cursor-pointer">
+              Explore Live Demo
+            </button>
           </div>
-          <div class="flex-1 min-w-0">
-            <div class="text-xs font-mono uppercase tracking-widest text-violet-400 font-semibold">Now Playing</div>
-            <h3 class="text-base font-bold text-white truncate">Neon Spectral Drift (Hi-Fi Master)</h3>
-            <p class="text-xs text-stone-400">Synthesizer Odyssey &bull; 48kHz 24-bit Lossless</p>
-          </div>
-          <span class="px-2.5 py-1 text-[10px] font-mono bg-violet-500/10 text-violet-400 border border-violet-500/20 rounded-full font-bold">LIVE STREAM</span>
         </div>
 
-        <!-- Simulated Frequency Spectrum Bars -->
-        <div class="flex items-end justify-between h-16 gap-1 px-2 mb-4 bg-zinc-950/60 rounded-xl p-3 border border-white/5">
-          <span class="w-1.5 bg-violet-500 rounded-full h-[65%] animate-pulse"></span>
-          <span class="w-1.5 bg-violet-400 rounded-full h-[85%]"></span>
-          <span class="w-1.5 bg-indigo-500 rounded-full h-[40%]"></span>
-          <span class="w-1.5 bg-cyan-400 rounded-full h-[95%] animate-pulse"></span>
-          <span class="w-1.5 bg-violet-500 rounded-full h-[60%]"></span>
-          <span class="w-1.5 bg-indigo-400 rounded-full h-[75%]"></span>
-          <span class="w-1.5 bg-cyan-300 rounded-full h-[50%] animate-pulse"></span>
-          <span class="w-1.5 bg-violet-600 rounded-full h-[90%]"></span>
-          <span class="w-1.5 bg-indigo-500 rounded-full h-[30%]"></span>
-          <span class="w-1.5 bg-cyan-400 rounded-full h-[80%] animate-pulse"></span>
-          <span class="w-1.5 bg-violet-400 rounded-full h-[70%]"></span>
-          <span class="w-1.5 bg-indigo-600 rounded-full h-[45%]"></span>
+        <!-- 3-Column Features Bento Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+          <div class="p-4 rounded-xl ${isNeobrutalist ? 'bg-[#fff59d] border-2 border-black shadow-[3px_3px_0px_#000]' : 'bg-black/30 border border-white/10'}">
+            <div class="text-2xl mb-2">⚡</div>
+            <h4 class="text-sm font-bold mb-1">Sub-10ms Pipeline</h4>
+            <p class="text-[11px] ${isNeobrutalist ? 'text-zinc-800' : 'text-stone-400'} leading-relaxed">Reactive streaming engine designed for zero lag under extreme concurrent throughput.</p>
+          </div>
+          <div class="p-4 rounded-xl ${isNeobrutalist ? 'bg-[#a7f3d0] border-2 border-black shadow-[3px_3px_0px_#000]' : 'bg-black/30 border border-white/10'}">
+            <div class="text-2xl mb-2">🛡️</div>
+            <h4 class="text-sm font-bold mb-1">SOC-2 Type II Ready</h4>
+            <p class="text-[11px] ${isNeobrutalist ? 'text-zinc-800' : 'text-stone-400'} leading-relaxed">Enterprise compliance validation with automated role-based access isolation.</p>
+          </div>
+          <div class="p-4 rounded-xl ${isNeobrutalist ? 'bg-[#bae6fd] border-2 border-black shadow-[3px_3px_0px_#000]' : 'bg-black/30 border border-white/10'}">
+            <div class="text-2xl mb-2">🌐</div>
+            <h4 class="text-sm font-bold mb-1">Edge Mesh Sync</h4>
+            <p class="text-[11px] ${isNeobrutalist ? 'text-zinc-800' : 'text-stone-400'} leading-relaxed">Distributed state synchronization across 35 edge clusters worldwide.</p>
+          </div>
         </div>
 
-        <!-- Player Controls -->
-        <div class="flex items-center justify-between pt-2">
-          <span class="text-[11px] font-mono text-stone-400" id="time-display">02:41 / 04:15</span>
-          <div class="flex items-center gap-3">
-            <button onclick="skipPrev()" class="p-2 text-stone-400 hover:text-white hover:bg-white/5 rounded-lg transition-all cursor-pointer">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/></svg>
-            </button>
-            <button onclick="togglePlay()" id="play-btn" class="w-11 h-11 bg-white text-zinc-950 hover:bg-violet-400 hover:text-white rounded-full flex items-center justify-center font-bold transition-all shadow-lg shadow-white/10 cursor-pointer">
-              <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-            </button>
-            <button onclick="skipNext()" class="p-2 text-stone-400 hover:text-white hover:bg-white/5 rounded-lg transition-all cursor-pointer">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"/></svg>
+        <!-- Interactive Pricing Tier Toggle -->
+        <div class="p-4 rounded-xl ${isNeobrutalist ? 'bg-white border-2 border-black shadow-[4px_4px_0px_#000]' : 'bg-black/40 border border-white/10'} flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div>
+            <div class="text-xs font-mono uppercase font-bold ${textAccent}">PRO SUITE &bull; LIMITED BETA</div>
+            <div class="text-xl font-extrabold font-mono mt-0.5">$79<span class="text-xs font-normal opacity-70"> / seat / mo</span></div>
+            <div class="text-[11px] opacity-70">Includes unlimited generation tokens & 24/7 dedicated support.</div>
+          </div>
+          <button onclick="handleAction('Upgrade to Pro Suite')" class="px-5 py-2.5 rounded-xl text-xs uppercase tracking-wider transition-all cursor-pointer ${buttonPrimary}">
+            Claim Early Access &rarr;
+          </button>
+        </div>
+      </div>
+    `;
+  } else if (isPortfolio) {
+    specificUiContent = `
+      <!-- Portfolio Grid & Showcase -->
+      <div class="space-y-6">
+        <div class="flex items-center gap-4 pb-4 border-b ${isNeobrutalist ? 'border-black' : 'border-white/10'}">
+          <div class="w-14 h-14 rounded-2xl ${isNeobrutalist ? 'bg-[#ff6b6b] border-2 border-black shadow-[3px_3px_0px_#000]' : 'bg-gradient-to-tr from-violet-600 to-indigo-500'} flex items-center justify-center text-white text-xl font-black">
+            ✦
+          </div>
+          <div class="flex-1">
+            <h3 class="text-lg font-extrabold">Spatial Engineering & UI Studio</h3>
+            <p class="text-xs ${isNeobrutalist ? 'text-zinc-700' : 'text-stone-400'}">Designing high-impact digital experiences for frontier tech startups.</p>
+          </div>
+          <button onclick="handleAction('Schedule Intro Call')" class="px-3.5 py-2 rounded-xl text-xs transition-all cursor-pointer ${buttonPrimary}">
+            Hire Studio
+          </button>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+          <button onclick="filterPortfolio('all')" class="px-3 py-1.5 rounded-lg ${isNeobrutalist ? 'bg-black text-white font-bold' : 'bg-white/15 text-white font-semibold'} transition-all cursor-pointer">All Projects</button>
+          <button onclick="filterPortfolio('saas')" class="px-3 py-1.5 rounded-lg ${isNeobrutalist ? 'bg-white border-2 border-black text-black font-bold' : 'bg-white/5 text-stone-300 hover:text-white'} transition-all cursor-pointer">SaaS Apps</button>
+          <button onclick="filterPortfolio('fintech')" class="px-3 py-1.5 rounded-lg ${isNeobrutalist ? 'bg-white border-2 border-black text-black font-bold' : 'bg-white/5 text-stone-300 hover:text-white'} transition-all cursor-pointer">Fintech</button>
+          <button onclick="filterPortfolio('hardware')" class="px-3 py-1.5 rounded-lg ${isNeobrutalist ? 'bg-white border-2 border-black text-black font-bold' : 'bg-white/5 text-stone-300 hover:text-white'} transition-all cursor-pointer">Hardware HUD</button>
+        </div>
+
+        <!-- Case Study Cards Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="rounded-xl overflow-hidden ${isNeobrutalist ? 'bg-[#fed7aa] border-2 border-black shadow-[4px_4px_0px_#000]' : 'bg-black/40 border border-white/10'} p-4 transition-all hover:-translate-y-1 cursor-pointer" onclick="handleAction('View Apex Case Study')">
+            <div class="text-[10px] font-mono font-bold uppercase tracking-wider mb-1 ${textAccent}">FinTech &bull; 2026</div>
+            <h4 class="text-sm font-bold mb-1.5">Apex Capital Prime Brokerage</h4>
+            <p class="text-[11px] ${isNeobrutalist ? 'text-zinc-800' : 'text-stone-400'} mb-3">Sub-millisecond institutional crypto order routing & margin audit engine.</p>
+            <span class="text-xs font-bold underline">Case Study &rarr;</span>
+          </div>
+
+          <div class="rounded-xl overflow-hidden ${isNeobrutalist ? 'bg-[#ddd6fe] border-2 border-black shadow-[4px_4px_0px_#000]' : 'bg-black/40 border border-white/10'} p-4 transition-all hover:-translate-y-1 cursor-pointer" onclick="handleAction('View Orbit Case Study')">
+            <div class="text-[10px] font-mono font-bold uppercase tracking-wider mb-1 ${textAccent}">Aerospace &bull; 2026</div>
+            <h4 class="text-sm font-bold mb-1.5">Orbit Dynamics Constellation</h4>
+            <p class="text-[11px] ${isNeobrutalist ? 'text-zinc-800' : 'text-stone-400'} mb-3">Real-time low-earth orbit constellation telemetry & optical links dashboard.</p>
+            <span class="text-xs font-bold underline">Case Study &rarr;</span>
+          </div>
+        </div>
+      </div>
+    `;
+  } else if (isEcommerce) {
+    specificUiContent = `
+      <!-- Modern Ecommerce Storefront & Product -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center">
+        <!-- Product Visual Card -->
+        <div class="p-6 rounded-2xl ${isNeobrutalist ? 'bg-[#fef08a] border-2 border-black shadow-[5px_5px_0px_#000]' : 'bg-black/50 border border-white/10'} text-center relative">
+          <span class="absolute top-3 left-3 px-2 py-0.5 text-[10px] font-mono font-bold rounded-md ${tagStyle}">IN STOCK &bull; SHIPS TODAY</span>
+          <div class="w-32 h-32 mx-auto my-4 rounded-2xl bg-gradient-to-tr from-stone-800 to-zinc-700 flex items-center justify-center text-5xl shadow-xl">
+            ⌨️
+          </div>
+          <div class="text-xs font-mono opacity-60">Matte Obsidian Alloy Chassis</div>
+        </div>
+
+        <!-- Product Actions -->
+        <div class="space-y-4">
+          <div>
+            <div class="text-xs font-mono uppercase tracking-wider ${textAccent} font-bold">Limited Studio Drop #09</div>
+            <h3 class="text-xl font-extrabold tracking-tight mt-0.5">CyberClack 75 Pro Keyboard</h3>
+            <div class="text-2xl font-black font-mono mt-1">$289.00</div>
+          </div>
+
+          <!-- Color Swatches -->
+          <div>
+            <label class="text-[11px] font-mono uppercase font-bold opacity-70 block mb-1.5">Switch Type</label>
+            <div class="flex items-center gap-2">
+              <button onclick="handleAction('Selected Linear Glacier')" class="px-3 py-1 text-xs rounded-lg ${isNeobrutalist ? 'bg-[#a3e635] border-2 border-black font-bold' : 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-medium'}">Linear Glacier</button>
+              <button onclick="handleAction('Selected Tactile Amber')" class="px-3 py-1 text-xs rounded-lg ${isNeobrutalist ? 'bg-white border-2 border-black' : 'bg-white/5 border border-white/10 text-stone-300'}">Tactile Amber</button>
+            </div>
+          </div>
+
+          <!-- Quantity & Add to Cart -->
+          <div class="flex items-center gap-3 pt-2">
+            <div class="flex items-center border ${isNeobrutalist ? 'border-2 border-black bg-white' : 'border-white/20 bg-black/40'} rounded-xl px-3 py-2 text-xs font-mono font-bold">
+              <button onclick="handleAction('Qty Decreased')" class="px-1.5 hover:opacity-70">&minus;</button>
+              <span class="px-3" id="cart-qty">1</span>
+              <button onclick="handleAction('Qty Increased')" class="px-1.5 hover:opacity-70">&plus;</button>
+            </div>
+            <button onclick="handleAction('Added CyberClack 75 to Cart')" class="flex-1 py-3 px-4 rounded-xl text-xs uppercase tracking-wider font-bold transition-all cursor-pointer ${buttonPrimary}">
+              Add to Bag &bull; $289 &rarr;
             </button>
           </div>
+        </div>
+      </div>
+    `;
+  } else if (isEmbedWidget) {
+    specificUiContent = `
+      <!-- Compact Embeddable Widget -->
+      <div class="p-5 rounded-2xl ${isNeobrutalist ? 'bg-white border-2 border-black shadow-[4px_4px_0px_#000]' : 'bg-black/50 border border-white/10'} space-y-4">
+        <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
-            <svg class="w-4 h-4 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
-            <input type="range" class="w-16 accent-violet-500 cursor-pointer" value="80" />
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span class="text-xs font-mono uppercase font-bold">Embeddable Staking Yield Calculator</span>
           </div>
+          <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold">LIVE APY 14.8%</span>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between text-xs font-mono mb-1">
+            <span>Staked Amount:</span>
+            <span class="font-bold text-sm" id="stake-display">10,000 USDC</span>
+          </div>
+          <input type="range" min="1000" max="100000" step="1000" value="10000" oninput="updateStake(this.value)" class="w-full accent-emerald-500 cursor-pointer" />
+        </div>
+
+        <div class="p-3 rounded-xl ${isNeobrutalist ? 'bg-[#e0e7ff] border-2 border-black' : 'bg-zinc-950/80 border border-white/10'} flex items-center justify-between">
+          <div>
+            <div class="text-[10px] font-mono uppercase opacity-70">Estimated 30-Day Earnings</div>
+            <div class="text-lg font-bold font-mono text-emerald-400" id="yield-display">+$123.33 USDC</div>
+          </div>
+          <button onclick="handleAction('Executed One-Click Stake')" class="px-3.5 py-2 rounded-lg text-xs font-bold ${buttonPrimary} transition-all cursor-pointer">
+            Stake Now
+          </button>
+        </div>
+
+        <div class="pt-2 flex items-center justify-between text-[11px] opacity-70 border-t ${isNeobrutalist ? 'border-black' : 'border-white/10'}">
+          <span>Embed Widget ID: #FW-8492</span>
+          <button onclick="handleAction('Embed Code Copied')" class="hover:underline font-mono font-bold cursor-pointer">&lt;/&gt; Copy Embed Snippet</button>
+        </div>
+      </div>
+    `;
+  } else if (isAuth) {
+    specificUiContent = `
+      <!-- Authentication Flow -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center">
+        <div class="p-6 rounded-2xl ${isNeobrutalist ? 'bg-[#c7d2fe] border-2 border-black shadow-[4px_4px_0px_#000]' : 'bg-black/50 border border-white/10'} space-y-3">
+          <div class="w-10 h-10 rounded-xl bg-black text-white flex items-center justify-center font-black">✦</div>
+          <h3 class="text-lg font-black">Welcome Back</h3>
+          <p class="text-xs ${isNeobrutalist ? 'text-zinc-800' : 'text-stone-400'}">Access your high-performance design environment and cloud workspace.</p>
+          <div class="text-[11px] font-mono opacity-80 pt-2">&check; Hardware security keys supported</div>
+        </div>
+
+        <div class="space-y-3">
+          <div>
+            <label class="text-[11px] font-mono uppercase block mb-1 font-bold">Email Address</label>
+            <input type="email" placeholder="engineer@frontier.io" class="w-full p-2.5 rounded-xl text-xs ${isNeobrutalist ? 'bg-white border-2 border-black' : 'bg-black/60 border border-white/15 text-white'} focus:outline-none" />
+          </div>
+          <div>
+            <label class="text-[11px] font-mono uppercase block mb-1 font-bold">Password</label>
+            <input type="password" value="••••••••••••" class="w-full p-2.5 rounded-xl text-xs ${isNeobrutalist ? 'bg-white border-2 border-black' : 'bg-black/60 border border-white/15 text-white'} focus:outline-none" />
+          </div>
+          <button onclick="handleAction('Signed in successfully')" class="w-full py-3 rounded-xl text-xs uppercase tracking-wider font-bold transition-all cursor-pointer ${buttonPrimary}">
+            Sign In to Workspace &rarr;
+          </button>
+        </div>
+      </div>
+    `;
+  } else if (isDocs) {
+    specificUiContent = `
+      <!-- Developer Documentation Hub -->
+      <div class="space-y-4">
+        <div class="flex items-center justify-between pb-3 border-b ${isNeobrutalist ? 'border-black' : 'border-white/10'}">
+          <div class="flex items-center gap-2">
+            <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-emerald-500/20 text-emerald-400 font-bold">POST</span>
+            <code class="text-xs font-mono font-bold">/v1/agent/synthesize</code>
+          </div>
+          <span class="text-[11px] font-mono opacity-70">Rate Limit: 5,000 req/min</span>
+        </div>
+
+        <div class="p-3.5 rounded-xl ${isNeobrutalist ? 'bg-zinc-950 text-emerald-400 border-2 border-black font-mono' : 'bg-black/70 border border-white/10 font-mono'} text-xs overflow-x-auto">
+<pre class="leading-relaxed"><code>{
+  "model": "gemini-3.8-flash",
+  "temperature": 0.7,
+  "stream": true,
+  "target": "luxury-bento-dashboard"
+}</code></pre>
+        </div>
+
+        <div class="flex items-center justify-between pt-2">
+          <span class="text-xs font-mono opacity-70">Status: 200 OK (8.2ms latency)</span>
+          <button onclick="handleAction('Executed API Test Request')" class="px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${buttonPrimary}">
+            Send Test Request &rarr;
+          </button>
         </div>
       </div>
     `;
@@ -315,126 +560,77 @@ export function generateRichComponentHtml(userRequest: string, styleInspiration:
     specificUiContent = `
       <!-- Financial Cockpit / Ledger -->
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-        <div class="p-4 bg-zinc-900/80 rounded-xl border border-emerald-500/20">
+        <div class="p-4 ${cardBg} rounded-xl ${borderStyle}">
           <div class="text-[11px] font-mono uppercase text-emerald-400 font-bold mb-1 flex items-center justify-between">
             <span>Liquid Solvency</span>
             <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
           </div>
-          <div class="text-2xl font-bold text-white font-mono">$142,850.00</div>
+          <div class="text-2xl font-bold font-mono">$142,850.00</div>
           <div class="text-[10px] text-emerald-400/80 mt-1 font-semibold">&uarr; +14.2% vs last cycle</div>
         </div>
-        <div class="p-4 bg-zinc-900/80 rounded-xl border border-white/10">
-          <div class="text-[11px] font-mono uppercase text-stone-400 font-semibold mb-1">Payroll Obligation</div>
-          <div class="text-2xl font-bold text-white font-mono">$68,200.00</div>
+        <div class="p-4 ${cardBg} rounded-xl ${borderStyle}">
+          <div class="text-[11px] font-mono uppercase opacity-70 font-semibold mb-1">Payroll Obligation</div>
+          <div class="text-2xl font-bold font-mono">$68,200.00</div>
           <div class="text-[10px] text-amber-400 mt-1 font-semibold">Due in: 3 Days (100% Funded)</div>
         </div>
-        <div class="p-4 bg-zinc-900/80 rounded-xl border border-white/10">
-          <div class="text-[11px] font-mono uppercase text-stone-400 font-semibold mb-1">Trapped Receivables</div>
+        <div class="p-4 ${cardBg} rounded-xl ${borderStyle}">
+          <div class="text-[11px] font-mono uppercase opacity-70 font-semibold mb-1">Trapped Receivables</div>
           <div class="text-2xl font-bold text-cyan-400 font-mono">$89,410.00</div>
           <div class="text-[10px] text-cyan-400/80 mt-1 font-semibold">12 Invoices Eligible</div>
         </div>
       </div>
 
-      <div class="p-4 bg-black/40 rounded-xl border border-white/10 mb-6">
-        <div class="flex items-center justify-between mb-3">
-          <h4 class="text-xs font-mono uppercase font-bold text-stone-300">Fast Factoring & Runway Actions</h4>
-          <span class="text-[11px] text-emerald-400 font-mono">Instant Liquidity Enabled</span>
+      <div class="p-4 ${cardBg} rounded-xl ${borderStyle} mb-4 flex items-center justify-between">
+        <div>
+          <h4 class="text-xs font-mono uppercase font-bold">Fast Factoring & Runway Bridge</h4>
+          <p class="text-[11px] opacity-70">Instant liquidity release with zero dilution.</p>
         </div>
-        <div class="flex flex-wrap gap-2">
-          <button onclick="handleAction('Advance Invoices')" class="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold text-xs rounded-lg transition-all shadow-md shadow-emerald-500/20 cursor-pointer">
-            &darr; Unlock Trapped Cash
-          </button>
-          <button onclick="handleAction('Audit Ledger')" class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-stone-200 font-semibold text-xs rounded-lg border border-white/10 transition-all cursor-pointer">
-            Run DD+7 Audit
-          </button>
-        </div>
-      </div>
-    `;
-  } else if (isTask) {
-    specificUiContent = `
-      <!-- Interactive Task Matrix -->
-      <div class="space-y-2 mb-6" id="task-list">
-        <div class="task-item p-3.5 bg-zinc-900/90 hover:bg-zinc-800/90 border border-white/10 rounded-xl flex items-center justify-between transition-all cursor-pointer" onclick="toggleTask(this)">
-          <div class="flex items-center gap-3">
-            <div class="checkbox-circle w-5 h-5 rounded-md border-2 border-emerald-500/40 flex items-center justify-center text-transparent hover:border-emerald-400 transition-all">
-              <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg>
-            </div>
-            <div>
-              <div class="text-sm font-semibold text-white">Synthesize Production Schema</div>
-              <div class="text-[11px] text-stone-400">Database &bull; High Priority</div>
-            </div>
-          </div>
-          <span class="px-2.5 py-0.5 text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 rounded-md font-bold">READY</span>
-        </div>
-
-        <div class="task-item p-3.5 bg-zinc-900/90 hover:bg-zinc-800/90 border border-white/10 rounded-xl flex items-center justify-between transition-all cursor-pointer" onclick="toggleTask(this)">
-          <div class="flex items-center gap-3">
-            <div class="checkbox-circle w-5 h-5 rounded-md border-2 border-emerald-500/40 flex items-center justify-center text-transparent hover:border-emerald-400 transition-all">
-              <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg>
-            </div>
-            <div>
-              <div class="text-sm font-semibold text-white">Deploy Telemetry Microservice</div>
-              <div class="text-[11px] text-stone-400">DevOps &bull; Sub-10ms Latency SLA</div>
-            </div>
-          </div>
-          <span class="px-2.5 py-0.5 text-[10px] font-mono bg-blue-500/10 text-blue-400 border border-blue-500/25 rounded-md font-bold">IN PROGRESS</span>
-        </div>
-
-        <div class="task-item p-3.5 bg-zinc-900/90 hover:bg-zinc-800/90 border border-white/10 rounded-xl flex items-center justify-between transition-all cursor-pointer" onclick="toggleTask(this)">
-          <div class="flex items-center gap-3">
-            <div class="checkbox-circle w-5 h-5 rounded-md border-2 border-emerald-500/40 flex items-center justify-center text-transparent hover:border-emerald-400 transition-all">
-              <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg>
-            </div>
-            <div>
-              <div class="text-sm font-semibold text-white">Run Security & Compliance Audit</div>
-              <div class="text-[11px] text-stone-400">Security &bull; SOC-2 Type II Check</div>
-            </div>
-          </div>
-          <span class="px-2.5 py-0.5 text-[10px] font-mono bg-amber-500/10 text-amber-400 border border-amber-500/25 rounded-md font-bold">PENDING</span>
-        </div>
+        <button onclick="handleAction('Unlock Trapped Receivables')" class="px-4 py-2 rounded-lg text-xs font-bold ${buttonPrimary} transition-all cursor-pointer">
+          Unlock Capital &rarr;
+        </button>
       </div>
     `;
   } else {
-    // Default interactive cockpit
+    // Default interactive dashboard / telemetry cockpit
     specificUiContent = `
       <!-- Primary Interactive Matrix -->
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-        <div class="p-5 bg-zinc-900/70 border border-white/10 rounded-xl hover:border-white/20 transition-all">
+        <div class="p-5 ${cardBg} ${borderStyle} rounded-xl hover:border-white/30 transition-all">
           <div class="flex items-center justify-between mb-3">
-            <span class="text-xs font-mono uppercase tracking-wider text-stone-400">Operational Pulse</span>
-            <span class="px-2 py-0.5 text-[10px] font-mono bg-emerald-500/10 text-emerald-400 rounded-full font-bold">ACTIVE</span>
+            <span class="text-xs font-mono uppercase tracking-wider opacity-70">Operational Pulse</span>
+            <span class="px-2 py-0.5 text-[10px] font-mono rounded-full font-bold ${tagStyle}">ACTIVE</span>
           </div>
-          <div class="text-3xl font-extrabold text-white font-mono tracking-tight">99.98%</div>
-          <p class="text-xs text-stone-400 mt-2">Zero packet drop detected over last 24-hour cycle.</p>
-          <div class="w-full bg-zinc-800 h-1.5 rounded-full mt-4 overflow-hidden">
+          <div class="text-3xl font-extrabold font-mono tracking-tight">99.98%</div>
+          <p class="text-xs opacity-70 mt-2">Zero packet drop detected over last 24-hour cycle.</p>
+          <div class="w-full bg-zinc-800/80 h-1.5 rounded-full mt-4 overflow-hidden">
             <div class="bg-gradient-to-r from-emerald-500 to-teal-400 h-full w-[94%]"></div>
           </div>
         </div>
 
-        <div class="p-5 bg-zinc-900/70 border border-white/10 rounded-xl hover:border-white/20 transition-all">
+        <div class="p-5 ${cardBg} ${borderStyle} rounded-xl hover:border-white/30 transition-all">
           <div class="flex items-center justify-between mb-3">
-            <span class="text-xs font-mono uppercase tracking-wider text-stone-400">Response Velocity</span>
-            <span class="px-2 py-0.5 text-[10px] font-mono bg-cyan-500/10 text-cyan-400 rounded-full font-bold">TURBO</span>
+            <span class="text-xs font-mono uppercase tracking-wider opacity-70">Response Velocity</span>
+            <span class="px-2 py-0.5 text-[10px] font-mono rounded-full font-bold ${tagStyle}">TURBO</span>
           </div>
           <div class="text-3xl font-extrabold text-cyan-400 font-mono tracking-tight">8.4ms</div>
-          <p class="text-xs text-stone-400 mt-2">Edge-accelerated query distribution across 18 regions.</p>
-          <div class="w-full bg-zinc-800 h-1.5 rounded-full mt-4 overflow-hidden">
+          <p class="text-xs opacity-70 mt-2">Edge-accelerated query distribution across 18 regions.</p>
+          <div class="w-full bg-zinc-800/80 h-1.5 rounded-full mt-4 overflow-hidden">
             <div class="bg-gradient-to-r from-cyan-500 to-blue-500 h-full w-[88%]"></div>
           </div>
         </div>
       </div>
 
-      <div class="p-4 bg-zinc-950/60 rounded-xl border border-white/10 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div class="p-4 ${cardBg} rounded-xl ${borderStyle} mb-4 flex flex-col sm:flex-row items-center justify-between gap-4">
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-400 font-bold">
             ⚡
           </div>
           <div>
-            <div class="text-sm font-bold text-white">Continuous Generation Engine</div>
-            <div class="text-xs text-stone-400">Autonomous optimization active & ready for export</div>
+            <div class="text-sm font-bold">Continuous Telemetry Engine</div>
+            <div class="text-xs opacity-70">Production build active & fully verified</div>
           </div>
         </div>
-        <button onclick="handleAction('Initialize Telemetry Stream')" class="w-full sm:w-auto px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-zinc-950 font-bold text-xs rounded-xl shadow-lg shadow-emerald-500/20 transition-all cursor-pointer">
+        <button onclick="handleAction('Run Live Diagnostics')" class="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-bold ${buttonPrimary} transition-all cursor-pointer">
           Run Diagnostics
         </button>
       </div>
@@ -454,22 +650,18 @@ export function generateRichComponentHtml(userRequest: string, styleInspiration:
     .font-mono { font-family: 'JetBrains Mono', monospace; }
   </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen p-4 sm:p-8 flex items-center justify-center antialiased selection:bg-emerald-500 selection:text-black">
-  <div class="w-full max-w-2xl bg-zinc-900/90 border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl relative overflow-hidden">
-    <!-- Ambient Gradient Orb -->
-    <div class="absolute -top-24 -right-24 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
-    <div class="absolute -bottom-24 -left-24 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
-
+<body class="${themeBg} min-h-screen p-4 sm:p-8 flex items-center justify-center antialiased">
+  <div class="w-full max-w-2xl ${cardBg} ${borderStyle} rounded-3xl p-6 sm:p-8 ${shadowStyle} relative overflow-hidden backdrop-blur-xl">
     <!-- Header Section -->
     <div class="flex items-start justify-between gap-4 mb-6 relative z-10">
       <div>
-        <div class="inline-flex items-center gap-2 px-3 py-1 bg-white/5 border border-white/10 rounded-full text-[11px] font-mono text-emerald-400 mb-2 font-medium">
-          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-mono ${tagStyle} mb-2 font-medium">
+          <span class="w-1.5 h-1.5 rounded-full bg-current animate-pulse"></span>
           <span>${styleInspiration}</span>
         </div>
-        <h2 class="text-xl sm:text-2xl font-extrabold text-white tracking-tight">${cleanTitle}</h2>
+        <h2 class="text-xl sm:text-2xl font-extrabold tracking-tight">${cleanTitle}</h2>
       </div>
-      <button onclick="handleAction('Settings & Preferences')" class="p-2.5 bg-white/5 hover:bg-white/10 text-stone-300 hover:text-white rounded-xl border border-white/10 transition-all cursor-pointer" title="Component Preferences">
+      <button onclick="handleAction('Component Options')" class="p-2.5 rounded-xl ${isNeobrutalist ? 'bg-white border-2 border-black' : 'bg-white/5 border border-white/10 text-stone-300'} transition-all cursor-pointer" title="Options">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
       </button>
     </div>
@@ -480,17 +672,17 @@ export function generateRichComponentHtml(userRequest: string, styleInspiration:
     </div>
 
     <!-- Feedback Toast Container -->
-    <div id="toast" class="hidden fixed bottom-6 right-6 bg-zinc-900 border border-emerald-500/40 text-emerald-400 px-4 py-2.5 rounded-xl shadow-2xl text-xs font-mono font-semibold transition-all duration-300 transform translate-y-2">
+    <div id="toast" class="hidden fixed bottom-6 right-6 ${isNeobrutalist ? 'bg-[#ffea00] border-2 border-black text-black' : 'bg-zinc-900 border border-emerald-500/40 text-emerald-400'} px-4 py-2.5 rounded-xl shadow-2xl text-xs font-mono font-semibold transition-all duration-300 transform translate-y-2">
       Action Executed Successfully
     </div>
 
     <!-- Footer Controls -->
-    <div class="pt-4 border-t border-white/10 flex items-center justify-between text-xs text-stone-400 relative z-10">
+    <div class="pt-4 border-t ${isNeobrutalist ? 'border-black' : 'border-white/10'} flex items-center justify-between text-xs opacity-70 relative z-10">
       <span class="font-mono text-[11px]">Flash UI &bull; Production Ready</span>
-      <div class="flex items-center gap-2">
-        <button onclick="handleAction('Export React Code')" class="hover:text-emerald-400 transition-colors font-medium cursor-pointer">React JSX</button>
+      <div class="flex items-center gap-2 font-medium">
+        <button onclick="handleAction('Export React Code')" class="hover:underline cursor-pointer">React JSX</button>
         <span>&bull;</span>
-        <button onclick="handleAction('Export Tailwind')" class="hover:text-emerald-400 transition-colors font-medium cursor-pointer">Tailwind CSS</button>
+        <button onclick="handleAction('Export Tailwind')" class="hover:underline cursor-pointer">Tailwind CSS</button>
       </div>
     </div>
   </div>
@@ -499,7 +691,7 @@ export function generateRichComponentHtml(userRequest: string, styleInspiration:
     function handleAction(name) {
       const toast = document.getElementById('toast');
       if (toast) {
-        toast.textContent = '✨ ' + name + ' Triggered';
+        toast.textContent = '✨ ' + name;
         toast.classList.remove('hidden');
         toast.classList.remove('translate-y-2');
         setTimeout(() => {
@@ -509,37 +701,20 @@ export function generateRichComponentHtml(userRequest: string, styleInspiration:
       }
     }
 
-    function toggleTask(el) {
-      const check = el.querySelector('.checkbox-circle');
-      if (check) {
-        const isDone = check.classList.contains('bg-emerald-500');
-        if (isDone) {
-          check.classList.remove('bg-emerald-500', 'text-black');
-          check.classList.add('text-transparent');
-          el.classList.remove('opacity-60');
-        } else {
-          check.classList.add('bg-emerald-500', 'text-black');
-          check.classList.remove('text-transparent');
-          el.classList.add('opacity-60');
-          handleAction('Task Marked Completed');
-        }
+    function updateStake(val) {
+      const num = parseInt(val, 10);
+      const disp = document.getElementById('stake-display');
+      const yieldDisp = document.getElementById('yield-display');
+      if (disp) disp.textContent = num.toLocaleString() + ' USDC';
+      if (yieldDisp) {
+        const est = (num * 0.148 / 12).toFixed(2);
+        yieldDisp.textContent = '+$' + parseFloat(est).toLocaleString() + ' USDC';
       }
     }
 
-    let isPlaying = false;
-    function togglePlay() {
-      isPlaying = !isPlaying;
-      const btn = document.getElementById('play-btn');
-      if (btn) {
-        btn.innerHTML = isPlaying 
-          ? '<svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>'
-          : '<svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
-      }
-      handleAction(isPlaying ? 'Playback Started' : 'Playback Paused');
+    function filterPortfolio(category) {
+      handleAction('Filtered portfolio by ' + category);
     }
-
-    function skipPrev() { handleAction('Previous Track'); }
-    function skipNext() { handleAction('Next Track'); }
   </script>
 </body>
 </html>`;

@@ -9,6 +9,7 @@ import ArtifactCard from './ArtifactCard';
 import { SparklesIcon, SearchIcon } from './Icons';
 import { Session, Attachment } from '../types';
 import { UploadCloud, Paperclip } from 'lucide-react';
+import SiteGeneratorMenu from './SiteGeneratorMenu';
 
 interface SessionDeckProps {
     sessions: Session[];
@@ -22,14 +23,6 @@ interface SessionDeckProps {
     attachments: Attachment[];
     setAttachments: React.Dispatch<React.SetStateAction<Attachment[]>>;
 }
-
-const RECOMMENDATIONS = [
-    { label: "SaaS Landing Page", prompt: "A modern high-conversion SaaS landing page with hero section, features grid, and pricing table." },
-    { label: "Dashboard Analytics", prompt: "A dark-mode analytics dashboard with data visualization widgets, sidebar navigation, and user profile." },
-    { label: "E-commerce Product", prompt: "A minimalist e-commerce product detail page with image gallery, size selector, and add to cart interaction." },
-    { label: "Auth Flow", prompt: "A split-screen authentication page with login form, social auth buttons, and testimonial slider." },
-    { label: "Portfolio Grid", prompt: "A masonry grid portfolio layout for a photographer with hover effects and lightbox modal." }
-];
 
 export default function SessionDeck({
     sessions,
@@ -124,23 +117,10 @@ export default function SessionDeck({
                      <h1 data-text="FLASH UI" className="glitch-hover">FLASH UI</h1>
                      <p style={{fontFamily: 'var(--font-mono)', fontSize: '0.9rem', letterSpacing: '4px', opacity: 0.6, textShadow: '0 0 10px var(--neon-glow)'}}>CORE_ENGINE_v1.0</p>
                      
-                     <div className="recommendations-grid">
-                        {RECOMMENDATIONS.map((rec, i) => (
-                            <button 
-                                key={i} 
-                                className="recommendation-chip"
-                                onClick={() => onRecommendationClick?.(rec.prompt)}
-                                disabled={isLoading}
-                                title={rec.prompt}
-                            >
-                                {rec.label}
-                            </button>
-                        ))}
-                     </div>
-
-                     <button className="surprise-button" onClick={onSurpriseMe} disabled={isLoading} title="Generate a random UI">
-                         <SparklesIcon /> Surprise Me
-                     </button>
+                     <SiteGeneratorMenu 
+                         onGenerate={(prompt) => onRecommendationClick?.(prompt)}
+                         isLoading={isLoading}
+                     />
 
                      <div 
                          className={`empty-dropzone ${isDragging ? 'dragging' : ''}`}
