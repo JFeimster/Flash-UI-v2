@@ -14,6 +14,8 @@ import {
     Briefcase,
     Compass
 } from 'lucide-react';
+import IntegrationsPanel from './IntegrationsPanel';
+import { AVAILABLE_INTEGRATIONS } from '../integrationsData';
 
 export interface SiteGeneratorMenuProps {
     onGenerate: (prompt: string) => void;
@@ -176,6 +178,31 @@ export default function SiteGeneratorMenu({ onGenerate, isLoading }: SiteGenerat
     const [selectedDomain, setSelectedDomain] = useState<string>(INDUSTRY_DOMAINS[0].id);
     const [selectedLayoutStance, setSelectedLayoutStance] = useState<string>(LAYOUT_STANCES[0].id);
 
+    // Integrations & External Services State
+    const [isIntegrationsOpen, setIsIntegrationsOpen] = useState<boolean>(false);
+    const [selectedIntegrations, setSelectedIntegrations] = useState<string[]>(['stripe', 'supabase', 'auth0']);
+    const [customApiKeys, setCustomApiKeys] = useState<Record<string, Record<string, string>>>({});
+
+    const handleToggleIntegration = (id: string) => {
+        setSelectedIntegrations(prev => 
+            prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+        );
+    };
+
+    const handleSelectIntegrationPreset = (ids: string[]) => {
+        setSelectedIntegrations(ids);
+    };
+
+    const handleUpdateApiKey = (integId: string, keyName: string, val: string) => {
+        setCustomApiKeys(prev => ({
+            ...prev,
+            [integId]: {
+                ...(prev[integId] || {}),
+                [keyName]: val
+            }
+        }));
+    };
+
     const [customTopic, setCustomTopic] = useState<string>('');
 
     const handleShuffle = () => {
@@ -269,6 +296,45 @@ export default function SiteGeneratorMenu({ onGenerate, isLoading }: SiteGenerat
             ? (customLayoutStance.trim() || 'Custom layout structure')
             : `${layoutObj.label} (${layoutObj.desc})`;
 
+        // External Integrations & Services Injection
+        let integrationsPrompt = '';
+        const selectedIntegObjs = AVAILABLE_INTEGRATIONS.filter(item => selectedIntegrations.includes(item.id));
+        if (selectedIntegObjs.length > 0) {
+            const specList = selectedIntegObjs.map(service => {
+                const userKeys = customApiKeys[service.id] || {};
+                const mergedKeys = { ...service.defaultEnvKeys, ...userKeys };
+                const envLines = Object.entries(mergedKeys).map(([k, v]) => `    ${k}="${v}"`).join('\n');
+                return `  * ${service.name} (${service.badge}):
+    Description: ${service.desc}
+    Injected Environment Variables (.env.local):
+${envLines}
+    Required Code Implementation:
+    - Include full client SDK initialization and import stencils.
+    - Provide realistic, interactive UI features for this service (e.g. Stripe checkout trigger, Supabase realtime table listener, Auth0/Clerk login & user avatar, Resend dispatch form, AI query drawer).
+    - Provide fallback mock state so the UI functions cleanly in preview.
+    Boilerplate Reference:
+    ${service.boilerplateSnippet.replace(/\n/g, '\n    ')}`;
+            }).join('\n\n');
+
+            integrationsPrompt = `
+EXTERNAL SERVICE INTEGRATIONS & BOILERPLATE (MANDATORY INJECTION):
+The user has configured ${selectedIntegObjs.length} external service integration(s): ${selectedIntegObjs.map(s => s.name).join(', ')}.
+You MUST inject and generate:
+1. Complete, working boilerplate initialization code for each selected integration (client SDK setup, service instances, and API call handlers).
+2. An embedded or commented .env.local configuration block containing the placeholder API keys specified below.
+3. Realistic interactive UI elements powered by these integrations:
+   - For Stripe: Include interactive checkout trigger buttons, simulated payment confirmation dialogs, pricing tier bindings, and customer portal links.
+   - For Supabase: Include live data table subscribers, record creation triggers, and realistic fallback mock data.
+   - For Auth0 / Clerk: Include working Sign In / Sign Out buttons with user avatar, session indicator, and protected route stencils.
+   - For Resend: Include an interactive notification/email dispatch form with simulated sending states.
+   - For AI SDK: Include a working prompt completion or query assistance drawer.
+4. An interactive "Integrations & API Keys" modal or toolbar badge in the generated application allowing the user to view the injected environment keys, test simulated API responses, and inspect the boilerplate code in real-time.
+
+Integration Specs & Placeholder Keys:
+${specList}
+`;
+        }
+
         const typeLabel = selectedType === 'recommend' ? 'Curated Interface' : selectedType === 'custom' ? (customType.trim() || 'Custom Application') : typeObj.label;
         const subject = customTopic.trim() || `Modern ${typeLabel}`;
 
@@ -279,7 +345,7 @@ FRAMEWORK / ARCHITECTURE: ${frameworkPrompt}.
 MOTION & ANIMATION: ${animationPrompt}.
 INDUSTRY DOMAIN: ${domainPrompt}.
 LAYOUT STANCE: ${layoutPrompt}.
-
+${integrationsPrompt}
 KEY REQUIREMENTS:
 - Complete standalone production-grade component with modern Tailwind CSS.
 - Highly interactive UI with working interactive buttons, filters, sliders, and realistic domain-native data.
@@ -665,6 +731,17 @@ KEY REQUIREMENTS:
                     )}
                 </div>
 
+                {/* External Integrations & Services Panel */}
+                <IntegrationsPanel 
+                    isOpen={isIntegrationsOpen}
+                    onToggleOpen={() => setIsIntegrationsOpen(!isIntegrationsOpen)}
+                    selectedIntegrations={selectedIntegrations}
+                    onToggleIntegration={handleToggleIntegration}
+                    onSelectPreset={handleSelectIntegrationPreset}
+                    customApiKeys={customApiKeys}
+                    onUpdateApiKey={handleUpdateApiKey}
+                />
+
                 {/* Primary Generate Button */}
                 <button
                     type="button"
@@ -675,6 +752,7 @@ KEY REQUIREMENTS:
                     <Sparkles size={15} />
                     <span>
                         Generate {selectedType === 'recommend' ? 'Curated Site' : selectedType === 'custom' ? (customType || 'Custom Site') : selectedType} ({selectedDesign === 'recommend' ? 'Adaptive Style' : selectedDesign === 'custom' ? (customDesign || 'Custom Style') : selectedDesign})
+                        {selectedIntegrations.length > 0 && ` • ${selectedIntegrations.length} Injected Service${selectedIntegrations.length > 1 ? 's' : ''}`}
                     </span>
                     <ArrowRight size={14} />
                 </button>
