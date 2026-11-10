@@ -107,6 +107,15 @@ export const useGenAI = () => {
 
     // Initialize state
     const [userApiKey, setUserApiKey] = useState<string>('');
+    const [useFreeAccess, setUseFreeAccess] = useState<boolean>(() => {
+        const stored = localStorage.getItem('flash_ui_free_access');
+        return stored !== null ? stored === 'true' : true;
+    });
+
+    useEffect(() => {
+        localStorage.setItem('flash_ui_free_access', useFreeAccess ? 'true' : 'false');
+    }, [useFreeAccess]);
+
     const [sessions, setSessions] = useState<Session[]>([]);
     const [savedArtifacts, setSavedArtifacts] = useState<Artifact[]>([]);
     const [folders, setFolders] = useState<Folder[]>([]);
@@ -136,6 +145,25 @@ export const useGenAI = () => {
 
         const unsubscribe = auth.onAuthStateChanged(async (user) => {
             setCurrentUser(user);
+
+            // Instantly load from localStorage cache to prevent blank screens/flashes on refresh
+            try {
+                const cachedSessions = localStorage.getItem(STORAGE_KEY);
+                if (cachedSessions) {
+                    setSessions(JSON.parse(cachedSessions));
+                }
+                const cachedSaved = localStorage.getItem(SAVED_KEY);
+                if (cachedSaved) {
+                    setSavedArtifacts(JSON.parse(cachedSaved));
+                }
+                const cachedFolders = localStorage.getItem('flash_ui_folders_v1');
+                if (cachedFolders) {
+                    setFolders(JSON.parse(cachedFolders));
+                }
+            } catch (e) {
+                console.warn("Failed to load quick-cache from localStorage:", e);
+            }
+
             if (user) {
                 setAuthLoading(true);
                 try {
@@ -245,20 +273,22 @@ export const useGenAI = () => {
         return () => unsubscribe();
     }, []);
 
-    // Persist to localStorage only when user is NOT logged in or debounce userApiKey write
+    // Persist to localStorage for instant load cache, and sync key/settings to Firebase if logged in
     useEffect(() => {
         const handler = setTimeout(async () => {
             try {
-                if (!auth.currentUser) {
-                    localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
-                    localStorage.setItem(SAVED_KEY, JSON.stringify(savedArtifacts));
-                    localStorage.setItem('flash_ui_folders_v1', JSON.stringify(folders));
-                    if (userApiKey) {
-                        localStorage.setItem(API_KEY_STORAGE_KEY, userApiKey);
-                    } else {
-                        localStorage.removeItem(API_KEY_STORAGE_KEY);
-                    }
+                // Always save sessions, saved items, and folders to localStorage so work is never lost on page refresh
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+                localStorage.setItem(SAVED_KEY, JSON.stringify(savedArtifacts));
+                localStorage.setItem('flash_ui_folders_v1', JSON.stringify(folders));
+                
+                if (userApiKey) {
+                    localStorage.setItem(API_KEY_STORAGE_KEY, userApiKey);
                 } else {
+                    localStorage.removeItem(API_KEY_STORAGE_KEY);
+                }
+
+                if (auth.currentUser) {
                     const user = auth.currentUser;
                     const userDocRef = doc(db, 'users', user.uid);
                     await updateDoc(userDocRef, {
@@ -288,14 +318,18 @@ export const useGenAI = () => {
                 },
                 body: JSON.stringify({
                     method: 'generateContent',
-                    model: 'gemini-3.5-flash',
+                    model: 'gemini-3.8-flash',
                     contents: [{ parts: [{ text: 'ping' }], role: 'user' }]
                 })
             });
 
             if (!response.ok) {
                 const errData = await response.json().catch(() => ({}));
-                throw new Error(errData.error || `Server returned status ${response.status}`);
+                const rawError = errData.error || `Server returned status ${response.status}`;
+                if (rawError.includes("402") || rawError.includes("prepayment") || rawError.includes("RESOURCE_EXHAUSTED")) {
+                    throw new Error("Prepayment credits are depleted on this project. Free Access Mode is active, or top up billing at ai.studio/projects.");
+                }
+                throw new Error(rawError);
             }
 
             const result = await response.json();
@@ -323,13 +357,15 @@ export const useGenAI = () => {
                         method: 'POST',
                         headers: { 
                             'Content-Type': 'application/json',
-                            ...(userApiKey ? { 'x-gemini-api-key': userApiKey } : {})
+                            ...(userApiKey ? { 'x-gemini-api-key': userApiKey } : {}),
+                            ...(useFreeAccess ? { 'x-gemini-free-access': 'true' } : {})
                         },
                         body: JSON.stringify({
                             method: 'generateContent',
                             model: params.model,
                             contents: params.contents,
-                            config: params.config
+                            config: params.config,
+                            useFreeAccess
                         })
                     });
                     if (!response.ok) {
@@ -343,13 +379,15 @@ export const useGenAI = () => {
                         method: 'POST',
                         headers: { 
                             'Content-Type': 'application/json',
-                            ...(userApiKey ? { 'x-gemini-api-key': userApiKey } : {})
+                            ...(userApiKey ? { 'x-gemini-api-key': userApiKey } : {}),
+                            ...(useFreeAccess ? { 'x-gemini-free-access': 'true' } : {})
                         },
                         body: JSON.stringify({
                             method: 'generateContentStream',
                             model: params.model,
                             contents: params.contents,
-                            config: params.config
+                            config: params.config,
+                            useFreeAccess
                         })
                     });
                     if (!response.ok) {
@@ -458,7 +496,7 @@ Required JSON Output Format (stream ONE object per line):
             `.trim();
 
             const responseStream = await withRetry(() => ai.models.generateContentStream({
-                model: 'gemini-3.5-flash',
+                model: 'gemini-3.8-flash',
                 contents: [{ parts: [{ text: prompt }], role: 'user' }],
                 config: { temperature: 1.2 }
             })) as any;
@@ -535,7 +573,7 @@ Required JSON Output Format (stream ONE object per line):
 
                 // Wrap style generation with retry logic
                 const styleResponse = await withRetry(() => ai.models.generateContent({
-                    model: 'gemini-3.5-flash',
+                    model: 'gemini-3.8-flash',
                     contents: { role: 'user', parts: [{ text: stylePrompt }] }
                 })) as GenerateContentResponse;
 
@@ -606,7 +644,7 @@ STRICT REQUIREMENTS:
 
                     // Wrap stream connection with retry logic
                     const responseStream = await withRetry(() => ai.models.generateContentStream({
-                        model: 'gemini-3.5-flash',
+                        model: 'gemini-3.8-flash',
                         contents: [{ parts, role: 'user' }],
                     })) as any;
 
@@ -758,7 +796,7 @@ STRICT REQUIREMENTS:
             `.trim();
 
             const result = await withRetry(() => ai.models.generateContent({
-                model: 'gemini-3.5-flash',
+                model: 'gemini-3.8-flash',
                 contents: [{ parts: [{ text: prompt }], role: 'user' }],
             })) as GenerateContentResponse;
 
@@ -891,7 +929,7 @@ STRICT REQUIREMENTS:
             const prompt = `Explain the following code snippet in a concise and clear way. Focus on the main functionality and key design choices:\n\n\`\`\`html\n${code}\n\`\`\``;
             
             const result = await withRetry(() => ai.models.generateContent({
-                model: 'gemini-3.5-flash',
+                model: 'gemini-3.8-flash',
                 contents: [{ parts: [{ text: prompt }], role: 'user' }],
             })) as GenerateContentResponse;
 
@@ -909,7 +947,7 @@ STRICT REQUIREMENTS:
             const prompt = `Refactor the following code snippet based on this instruction: "${instruction}". Return ONLY the refactored raw HTML/CSS. No Markdown.\n\n\`\`\`html\n${code}\n\`\`\``;
             
             const responseStream = await withRetry(() => ai.models.generateContentStream({
-                model: 'gemini-3.5-flash',
+                model: 'gemini-3.8-flash',
                 contents: [{ parts: [{ text: prompt }], role: 'user' }],
             })) as any;
 
@@ -955,7 +993,7 @@ Return ONLY a JSON array of objects with the following structure:
             `.trim();
 
             const response = await withRetry(() => ai.models.generateContent({
-                model: 'gemini-3.5-flash',
+                model: 'gemini-3.8-flash',
                 contents: [{ parts: [{ text: prompt }], role: 'user' }],
                 config: { responseMimeType: 'application/json' }
             })) as GenerateContentResponse;
@@ -977,7 +1015,7 @@ Ensure the animations are "sizzling", modern, and highly engaging.
 Return ONLY the complete updated raw HTML/CSS. No Markdown, no explanations.\n\n\`\`\`html\n${code}\n\`\`\``;
             
             const result = await withRetry(() => ai.models.generateContent({
-                model: 'gemini-3.5-flash',
+                model: 'gemini-3.8-flash',
                 contents: [{ parts: [{ text: prompt }], role: 'user' }],
             })) as GenerateContentResponse;
 
@@ -1022,7 +1060,7 @@ Return ONLY a JSON object with this exact schema:
             }
 
             const result = await withRetry(() => ai.models.generateContent({
-                model: 'gemini-3.5-flash',
+                model: 'gemini-3.8-flash',
                 contents: [{ parts: [{ text: prompt }], role: 'user' }],
                 config
             })) as GenerateContentResponse;
@@ -1069,7 +1107,7 @@ Return ONLY a JSON object with this exact structure:
             };
 
             const result = await withRetry(() => ai.models.generateContent({
-                model: 'gemini-3.5-flash',
+                model: 'gemini-3.8-flash',
                 contents: [{ parts: [{ text: prompt }], role: 'user' }],
                 config
             })) as GenerateContentResponse;
@@ -1104,7 +1142,7 @@ Return ONLY a JSON array of objects with the following structure:
             `.trim();
             
             const result = await withRetry(() => ai.models.generateContent({
-                model: 'gemini-3.5-flash',
+                model: 'gemini-3.8-flash',
                 contents: [{ parts: [{ text: prompt }], role: 'user' }],
                 config: { responseMimeType: 'application/json' }
             })) as GenerateContentResponse;
@@ -1203,7 +1241,7 @@ STRICT REQUIREMENTS:
             });
 
             const responseStream = await withRetry(() => ai.models.generateContentStream({
-                model: 'gemini-3.5-flash',
+                model: 'gemini-3.8-flash',
                 contents: [{ parts, role: 'user' }],
             })) as any;
 
@@ -1470,6 +1508,8 @@ STRICT REQUIREMENTS:
         reorderFolders,
         userApiKey,
         setUserApiKey,
+        useFreeAccess,
+        setUseFreeAccess,
         validateApiKey,
         apiKeyStatus,
         isLoading,

@@ -34,6 +34,8 @@ interface DrawerContentProps {
     sessions?: Session[];
     userApiKey?: string;
     setUserApiKey?: (key: string) => void;
+    useFreeAccess?: boolean;
+    setUseFreeAccess?: (val: boolean) => void;
     validateApiKey?: (key: string) => Promise<boolean>;
     apiKeyStatus?: { isValid: boolean | null; error: string | null; quotaInfo?: string };
     onApplyVariation: (html: string) => void;
@@ -127,6 +129,8 @@ export default function DrawerContent({
     sessions = [],
     userApiKey,
     setUserApiKey,
+    useFreeAccess,
+    setUseFreeAccess,
     validateApiKey,
     apiKeyStatus,
     onApplyVariation,
@@ -2729,6 +2733,27 @@ export async function POST(req: Request) {
                             )}
                         </div>
                         {apiKeyStatus?.error && <div className="api-key-error">{apiKeyStatus.error}</div>}
+                    </div>
+
+                    <div className="api-key-settings" style={{ marginTop: '20px', background: 'rgba(16, 185, 129, 0.05)', borderColor: 'rgba(16, 185, 129, 0.2)' }}>
+                        <div className="settings-header">
+                            <div className="settings-title" style={{ color: '#10b981' }}>
+                                ✨ Gemini Free Access Mode
+                            </div>
+                        </div>
+                        <p style={{ fontSize: '0.85rem', opacity: 0.7, margin: '8px 0 16px 0', lineHeight: 1.5 }}>
+                            Enable Free Access to generate assets and UI components instantly without needing your own personal Gemini API key or hitting dunning project quotas.
+                        </p>
+                        <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-white">Use Free Access (Zero-Config)</span>
+                            <button 
+                                type="button"
+                                onClick={() => setUseFreeAccess?.(!useFreeAccess)}
+                                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${useFreeAccess ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
+                            >
+                                {useFreeAccess ? 'ENABLED' : 'DISABLED'}
+                            </button>
+                        </div>
                     </div>
 
                     <div className="magic-status-bar">

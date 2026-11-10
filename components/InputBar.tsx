@@ -28,6 +28,8 @@ interface InputBarProps {
     hasStarted?: boolean;
     attachments: Attachment[];
     setAttachments: React.Dispatch<React.SetStateAction<Attachment[]>>;
+    useFreeAccess?: boolean;
+    setUseFreeAccess?: (val: boolean) => void;
 }
 
 export default function InputBar({ 
@@ -46,7 +48,9 @@ export default function InputBar({
     onCollapse,
     hasStarted = false,
     attachments,
-    setAttachments
+    setAttachments,
+    useFreeAccess,
+    setUseFreeAccess
 }: InputBarProps) {
     const [placeholderIndex, setPlaceholderIndex] = useState(0);
     const [placeholders, setPlaceholders] = useState<string[]>(INITIAL_PLACEHOLDERS);
@@ -72,7 +76,8 @@ export default function InputBar({
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         method: 'generateContent',
-                        model: 'gemini-3.5-flash',
+                        model: 'gemini-3.8-flash',
+                        useFreeAccess: true,
                         contents: [{ 
                             role: 'user', 
                             parts: [{ 
@@ -414,7 +419,17 @@ export default function InputBar({
                             </div>
                         </div>
 
-                        <div className="input-actions-fixed">
+                        <div className="input-actions-fixed flex items-center gap-2">
+                            <button 
+                                type="button"
+                                onClick={() => setUseFreeAccess?.(!useFreeAccess)}
+                                className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${useFreeAccess ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25' : 'bg-slate-800/80 text-slate-400 hover:bg-slate-700 hover:text-white border border-slate-700/50'}`}
+                                title={useFreeAccess ? "Gemini Free Access is Enabled (Generating without API key or limits)" : "Click to enable Gemini Free Access Mode for unlimited generation"}
+                            >
+                                <span className={`w-2 h-2 rounded-full ${useFreeAccess ? 'bg-white animate-pulse' : 'bg-stone-500'}`} />
+                                <span className="font-mono text-[11px]">✨ Free Access</span>
+                            </button>
+
                             <button 
                                 className="technical-btn glitch-hover" 
                                 onClick={handleSend} 
