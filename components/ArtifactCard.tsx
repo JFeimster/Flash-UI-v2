@@ -12,12 +12,14 @@ interface ArtifactCardProps {
     artifact: Artifact;
     isFocused: boolean;
     onClick: () => void;
+    onRecover?: (artifactId: string) => void;
 }
 
 const ArtifactCard = React.memo(({ 
     artifact, 
     isFocused, 
-    onClick
+    onClick,
+    onRecover
 }: ArtifactCardProps) => {
     const codeRef = useRef<HTMLPreElement>(null);
     const [previewWidth, setPreviewWidth] = useState<'100%' | '768px' | '375px'>('100%');
@@ -65,12 +67,21 @@ const ArtifactCard = React.memo(({
                         <h4 className="text-sm font-semibold text-white mb-2 uppercase tracking-wider">
                             API Quota or Limit Blocked
                         </h4>
-                        <p className="text-xs text-stone-400 max-w-[280px] leading-relaxed mb-4">
+                        <p className="text-xs text-stone-400 max-w-[280px] leading-relaxed mb-3">
                             The development key has encountered a Billing limit (Dunning Decision Denied). To continue seamlessly:
                         </p>
-                        <div className="text-[10px] bg-white/[0.03] border border-white/5 rounded px-3 py-2 text-stone-300 font-mono text-left max-w-[320px] mb-3">
+                        <div className="text-[10px] bg-white/[0.03] border border-white/5 rounded px-3 py-2 text-stone-300 font-mono text-left max-w-[320px] mb-4">
                             🔑 Click the <strong className="text-indigo-400">Settings Icon</strong> or <strong className="text-pink-400">AI Tools</strong> panel in the top-right toolbar and configure your own custom Google Gemini API Key.
                         </div>
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onRecover?.(artifact.id);
+                            }}
+                            className="text-[11px] font-semibold tracking-wider text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 hover:bg-emerald-500/25 px-4 py-2 rounded-md transition-all uppercase cursor-pointer shadow-sm shadow-emerald-500/20 flex items-center gap-1.5"
+                        >
+                            ✨ Generate with Free Access
+                        </button>
                     </div>
                 )}
                 

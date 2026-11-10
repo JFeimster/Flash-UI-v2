@@ -140,7 +140,8 @@ function App() {
     removeArtifactFromFolder,
     updateArtifactTags,
     updateFolderTags,
-    reorderFolders
+    reorderFolders,
+    recoverErroredArtifacts
   } = useGenAI();
 
   const [cookieGithubConnected, setCookieGithubConnected] = useState(false);
@@ -625,6 +626,7 @@ function App() {
                 onRecommendationClick={handleTemplateClick}
                 attachments={attachments}
                 setAttachments={setAttachments}
+                onRecoverArtifact={recoverErroredArtifacts}
             />
 
             {isRouterActive && (
@@ -818,6 +820,10 @@ function App() {
                                 {(() => {
                                     const lowerErr = generationError.toLowerCase();
                                     if (
+                                        lowerErr.includes("429") ||
+                                        lowerErr.includes("too many requests") ||
+                                        lowerErr.includes("rate limit") ||
+                                        lowerErr.includes("exception parsing response") ||
                                         lowerErr.includes("402") ||
                                         lowerErr.includes("payment") ||
                                         lowerErr.includes("prepayment") ||
@@ -833,7 +839,7 @@ function App() {
                                     ) {
                                         return (
                                             <span>
-                                                Google Gemini API prepayment credits are depleted or quota reached (402/403). You can continue creating and exporting components with unlimited generation in <strong>✨ Free Access Mode</strong>, or enter your personal Gemini API key.
+                                                Google Gemini API development key has reached quota or rate limit (429/402). You can continue creating and exporting components with unlimited generation in <strong>✨ Free Access Mode</strong>, or enter your personal Gemini API key.
                                             </span>
                                         );
                                     }
@@ -844,18 +850,17 @@ function App() {
                                     );
                                 })()}
                             </p>
-                            <div className="pt-2 flex items-center gap-3">
-                                {!useFreeAccess && (
-                                    <button
-                                        onClick={() => {
-                                            setUseFreeAccess(true);
-                                            setGenerationError(null);
-                                        }}
-                                        className="text-[11px] font-semibold tracking-wider text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 hover:bg-emerald-500/25 px-3 py-1.5 rounded-md transition-all uppercase cursor-pointer shadow-sm shadow-emerald-500/20"
-                                    >
-                                        ✨ Switch To Free Access
-                                    </button>
-                                )}
+                            <div className="pt-2 flex flex-wrap items-center gap-3">
+                                <button
+                                    onClick={() => {
+                                        setUseFreeAccess(true);
+                                        recoverErroredArtifacts();
+                                        setGenerationError(null);
+                                    }}
+                                    className="text-[11px] font-semibold tracking-wider text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 hover:bg-emerald-500/25 px-3 py-1.5 rounded-md transition-all uppercase cursor-pointer shadow-sm shadow-emerald-500/20"
+                                >
+                                    ✨ Auto-Recover with Free Access
+                                </button>
                                 <button
                                     onClick={handleOpenApiConfig}
                                     className="text-[11px] font-medium tracking-wider text-stone-300 bg-white/5 border border-white/10 hover:bg-white/10 px-3 py-1.5 rounded-md transition-all uppercase cursor-pointer"

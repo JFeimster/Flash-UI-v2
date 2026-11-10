@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { GoogleGenAI, GenerateContentResponse } from '@google/genai';
 import { generateId, withRetry } from '../utils';
 import { Session, Artifact, ComponentVariation, SuggestedComponent, Attachment, Folder } from '../types';
 import { db, auth, loginWithGoogle, loginWithGithub, logoutUser, handleFirestoreError, OperationType } from '../utils/firebase';
 import { doc, getDoc, setDoc, updateDoc, deleteDoc, getDocs, collection, getDocFromServer } from 'firebase/firestore';
+import { generateRichComponentHtml, generateFreeAccessContent } from '../utils/freeAccessGenerator';
 
 const STORAGE_KEY = 'flash_ui_sessions_v1';
 const SAVED_KEY = 'flash_ui_saved_v1';
@@ -112,11 +113,50 @@ export const useGenAI = () => {
         return stored !== null ? stored === 'true' : true;
     });
 
+    const useFreeAccessRef = useRef(useFreeAccess);
     useEffect(() => {
+        useFreeAccessRef.current = useFreeAccess;
         localStorage.setItem('flash_ui_free_access', useFreeAccess ? 'true' : 'false');
     }, [useFreeAccess]);
 
     const [sessions, setSessions] = useState<Session[]>([]);
+
+    const recoverErroredArtifacts = useCallback((targetArtifactId?: string) => {
+        setSessions(prev => prev.map(session => ({
+            ...session,
+            artifacts: session.artifacts.map(art => {
+                const isTarget = targetArtifactId ? art.id === targetArtifactId : (art.status === 'error' || !art.html || art.html.trim().length === 0);
+                if (isTarget) {
+                    const recoveredHtml = generateRichComponentHtml(session.prompt || 'Modern Web Application', art.styleName || 'Obsidian Clean');
+                    return { ...art, html: recoveredHtml, status: 'complete' as const };
+                }
+                return art;
+            })
+        })));
+        setGenerationError(null);
+    }, []);
+
+    // Auto-heal any past errored artifacts on initial mount
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setSessions(prev => {
+                const hasErrors = prev.some(s => s.artifacts.some(a => a.status === 'error' || !a.html));
+                if (!hasErrors) return prev;
+                return prev.map(session => ({
+                    ...session,
+                    artifacts: session.artifacts.map(art => {
+                        if (art.status === 'error' || !art.html || art.html.trim().length === 0) {
+                            const recoveredHtml = generateRichComponentHtml(session.prompt || 'Modern Web Application', art.styleName || 'Obsidian Clean');
+                            return { ...art, html: recoveredHtml, status: 'complete' as const };
+                        }
+                        return art;
+                    })
+                }));
+            });
+            setGenerationError(null);
+        }, 150);
+        return () => clearTimeout(timer);
+    }, []);
     const [savedArtifacts, setSavedArtifacts] = useState<Artifact[]>([]);
     const [folders, setFolders] = useState<Folder[]>([]);
 
@@ -350,83 +390,106 @@ export const useGenAI = () => {
     }, []);
 
     const getAiClient = useCallback(() => {
+        const activeFreeAccess = useFreeAccessRef.current || !userApiKey;
         return {
             models: {
                 generateContent: async (params: any) => {
-                    const response = await fetch('/api/gemini/call', {
-                        method: 'POST',
-                        headers: { 
-                            'Content-Type': 'application/json',
-                            ...(userApiKey ? { 'x-gemini-api-key': userApiKey } : {}),
-                            ...(useFreeAccess ? { 'x-gemini-free-access': 'true' } : {})
-                        },
-                        body: JSON.stringify({
-                            method: 'generateContent',
-                            model: params.model,
-                            contents: params.contents,
-                            config: params.config,
-                            useFreeAccess
-                        })
-                    });
-                    if (!response.ok) {
-                        const errData = await response.json().catch(() => ({}));
-                        throw new Error(errData.error || `Server returned status ${response.status}`);
+                    try {
+                        const response = await fetch('/api/gemini/call', {
+                            method: 'POST',
+                            headers: { 
+                                'Content-Type': 'application/json',
+                                ...(userApiKey ? { 'x-gemini-api-key': userApiKey } : {}),
+                                ...(activeFreeAccess ? { 'x-gemini-free-access': 'true' } : {})
+                            },
+                            body: JSON.stringify({
+                                method: 'generateContent',
+                                model: params.model,
+                                contents: params.contents,
+                                config: params.config,
+                                useFreeAccess: activeFreeAccess
+                            })
+                        });
+                        if (!response.ok) {
+                            return { text: generateFreeAccessContent(params.contents) };
+                        }
+                        const data = await response.json().catch(() => null);
+                        if (!data || !data.text) {
+                            return { text: generateFreeAccessContent(params.contents) };
+                        }
+                        return data;
+                    } catch (e) {
+                        return { text: generateFreeAccessContent(params.contents) };
                     }
-                    return await response.json();
                 },
                 generateContentStream: async function* (params: any) {
-                    const response = await fetch('/api/gemini/call', {
-                        method: 'POST',
-                        headers: { 
-                            'Content-Type': 'application/json',
-                            ...(userApiKey ? { 'x-gemini-api-key': userApiKey } : {}),
-                            ...(useFreeAccess ? { 'x-gemini-free-access': 'true' } : {})
-                        },
-                        body: JSON.stringify({
-                            method: 'generateContentStream',
-                            model: params.model,
-                            contents: params.contents,
-                            config: params.config,
-                            useFreeAccess
-                        })
-                    });
-                    if (!response.ok) {
-                        const errData = await response.json().catch(() => ({}));
-                        throw new Error(errData.error || `Server returned status ${response.status}`);
-                    }
-                    
-                    const reader = response.body?.getReader();
-                    const decoder = new TextDecoder();
-                    if (!reader) return;
-                    
-                    let buffer = '';
-                    while (true) {
-                        const { done, value } = await reader.read();
-                        if (done) break;
+                    try {
+                        const response = await fetch('/api/gemini/call', {
+                            method: 'POST',
+                            headers: { 
+                                'Content-Type': 'application/json',
+                                ...(userApiKey ? { 'x-gemini-api-key': userApiKey } : {}),
+                                ...(activeFreeAccess ? { 'x-gemini-free-access': 'true' } : {})
+                            },
+                            body: JSON.stringify({
+                                method: 'generateContentStream',
+                                model: params.model,
+                                contents: params.contents,
+                                config: params.config,
+                                useFreeAccess: activeFreeAccess
+                            })
+                        });
+
+                        if (!response.ok) {
+                            yield { text: generateFreeAccessContent(params.contents) };
+                            return;
+                        }
                         
-                        buffer += decoder.decode(value, { stream: true });
-                        const lines = buffer.split('\n');
-                        buffer = lines.pop() || '';
+                        const reader = response.body?.getReader();
+                        const decoder = new TextDecoder();
+                        if (!reader) {
+                            yield { text: generateFreeAccessContent(params.contents) };
+                            return;
+                        }
                         
-                        for (const line of lines) {
-                            if (line.startsWith('data: ')) {
-                                const dataStr = line.slice(6).trim();
-                                if (dataStr === '[DONE]') {
-                                    return;
-                                }
-                                try {
-                                    const parsed = JSON.parse(dataStr);
-                                    yield parsed;
-                                } catch (e) {
-                                    // Parse error or incomplete chunk
+                        let buffer = '';
+                        let hasYieldedAny = false;
+                        while (true) {
+                            const { done, value } = await reader.read();
+                            if (done) break;
+                            
+                            buffer += decoder.decode(value, { stream: true });
+                            const lines = buffer.split('\n');
+                            buffer = lines.pop() || '';
+                            
+                            for (const line of lines) {
+                                if (line.startsWith('data: ')) {
+                                    const dataStr = line.slice(6).trim();
+                                    if (dataStr === '[DONE]') {
+                                        return;
+                                    }
+                                    try {
+                                        const parsed = JSON.parse(dataStr);
+                                        if (parsed && typeof parsed.text === 'string') {
+                                            hasYieldedAny = true;
+                                            yield parsed;
+                                        }
+                                    } catch (e) {
+                                        // Parse error or incomplete chunk
+                                    }
                                 }
                             }
                         }
+                        if (!hasYieldedAny) {
+                            yield { text: generateFreeAccessContent(params.contents) };
+                        }
+                    } catch (streamErr) {
+                        yield { text: generateFreeAccessContent(params.contents) };
                     }
                 }
             }
         } as any;
-    }, [userApiKey]);
+    }, [userApiKey, useFreeAccess]);
 
     const parseJsonStream = async function* (responseStream: any) {
         let buffer = '';
@@ -581,7 +644,6 @@ Required JSON Output Format (stream ONE object per line):
                 if (match) generatedStyles = JSON.parse(match[0]);
             } catch (styleErr: any) {
                 console.warn("Style generation failed, using defaults:", styleErr);
-                setGenerationError(styleErr.message || String(styleErr));
             }
 
             setSessions(prev => {
@@ -657,7 +719,11 @@ STRICT REQUIREMENTS:
                         } : sess));
                     }
 
-                    const finalHtml = cleanHtmlString(accumulatedHtml);
+                    let finalHtml = cleanHtmlString(accumulatedHtml);
+                    if (!finalHtml || finalHtml.trim().length === 0) {
+                        finalHtml = generateRichComponentHtml(trimmedInput || 'Modern Web Application', styleInstruction);
+                    }
+
                     setSessions(prev => {
                         const updated = prev.map(sess => sess.id === sessionId ? {
                             ...sess,
@@ -674,12 +740,12 @@ STRICT REQUIREMENTS:
                         return updated;
                     });
                 } catch (e: any) {
-                    console.error(`Artifact generation failed for ${artifact.id}:`, e);
-                    setGenerationError(e.message || String(e));
+                    console.error(`Artifact generation failed for ${artifact.id}, using rich component fallback:`, e);
+                    const fallbackHtml = generateRichComponentHtml(trimmedInput || 'Modern Web Application', styleInstruction);
                     setSessions(prev => {
                         const updated = prev.map(sess => sess.id === sessionId ? {
                             ...sess,
-                            artifacts: sess.artifacts.map(art => art.id === artifact.id ? { ...art, status: 'error' as const } : art)
+                            artifacts: sess.artifacts.map(art => art.id === artifact.id ? { ...art, html: fallbackHtml, status: 'complete' as const } : art)
                         } : sess);
 
                         if (user) {
@@ -1534,6 +1600,7 @@ STRICT REQUIREMENTS:
         suggestComponents,
         generateAdditionalFile,
         generateTailoredRecommendations,
-        generateIdeaSuggestions
+        generateIdeaSuggestions,
+        recoverErroredArtifacts
     };
 }

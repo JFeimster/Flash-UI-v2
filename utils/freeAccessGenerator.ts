@@ -148,8 +148,8 @@ export function generateFreeAccessContent(contents: any): string {
   }
 
   // 7. Component Variations
-  if (promptText.includes("Required JSON Output Format") || promptText.includes("Invent a unique design persona name")) {
-    const rawUserReqMatch = promptText.match(/USER REQUEST:?\s*["']?([^"\n\r]+)/i);
+  if (promptText.includes("Required JSON Output Format") || promptText.includes("Invent a unique design persona name") || promptText.includes("RADICAL CONCEPTUAL VARIATIONS")) {
+    const rawUserReqMatch = promptText.match(/USER REQUEST:?\s*["']?([^"\n\r]+)/i) || promptText.match(/VARIATIONS of:\s*["']?([^"\n\r]+)/i);
     const userReq = rawUserReqMatch ? rawUserReqMatch[1] : "Interactive UI Component";
     
     return [
@@ -199,7 +199,7 @@ export function generateFreeAccessContent(contents: any): string {
 
 .component-glow {
   box-shadow: 0 0 25px rgba(16, 185, 129, 0.15);
-}`;
+} `;
     }
     if (promptText.includes(".js") || promptText.includes(".ts")) {
       return `// Flash UI Interactive Handlers
@@ -225,10 +225,12 @@ export async function streamFreeAccessContent(
 ): Promise<void> {
   const fullContent = generateFreeAccessContent(contents);
 
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-  res.setHeader("x-gemini-engine", "free-access-generator");
+  if (!res.headersSent) {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("x-gemini-engine", "free-access-generator");
+  }
 
   // Stream in realistic chunks
   const chunkSize = 40;
@@ -261,12 +263,20 @@ export function generateRichComponentHtml(userRequest: string, styleInspiration:
   const isDocs = /documentation|docs|api\s*reference/i.test(userRequest);
   const isAudio = /music|audio|sound|player|track|synth|podcast/i.test(userRequest);
   const isFinance = /payroll|crypto|bitcoin|trade|finance|wallet|cash|bank|stock|invoice/i.test(userRequest);
+  const isPricing = /pricing|tier|subscription/i.test(userRequest);
+  const isCalculator = /calculator|estimator|breakeven|roi/i.test(userRequest);
+  const isMobileApp = /mobile\s*app|pwa/i.test(userRequest);
+  const isEventConference = /event|conference|keynote|summit/i.test(userRequest);
 
   const isNeobrutalist = /neobrutal|brutalist/i.test(styleInspiration) || /neobrutal/i.test(userRequest);
   const isCyberpunk = /cyberpunk|neon|hud/i.test(styleInspiration) || /cyberpunk/i.test(userRequest);
   const isBioluminescent = /bioluminescent|deep-sea/i.test(styleInspiration) || /bioluminescent/i.test(userRequest);
   const isRetroCrt = /retro|crt|vintage/i.test(styleInspiration) || /retro/i.test(userRequest);
   const isFuturistic = /futuristic/i.test(styleInspiration) || /futuristic/i.test(userRequest);
+  const isRisograph = /risograph|grain/i.test(styleInspiration) || /risograph/i.test(userRequest);
+  const isBlueprint = /blueprint|industrial/i.test(styleInspiration) || /blueprint/i.test(userRequest);
+  const isDarkLuxe = /luxe|gold|cinematic/i.test(styleInspiration) || /luxe/i.test(userRequest);
+  const isVolumetric = /volumetric|spectral/i.test(styleInspiration) || /spectral/i.test(userRequest);
 
   // Styling theme tokens
   let themeBg = "bg-zinc-950";
@@ -285,6 +295,38 @@ export function generateRichComponentHtml(userRequest: string, styleInspiration:
     buttonPrimary = "bg-[#ffea00] hover:bg-[#ffe100] text-black font-extrabold border-2 border-black shadow-[4px_4px_0px_0px_#000]";
     tagStyle = "bg-[#a3e635] text-black border-2 border-black font-extrabold shadow-[2px_2px_0px_0px_#000]";
     shadowStyle = "shadow-[8px_8px_0px_0px_#000]";
+  } else if (isRisograph) {
+    themeBg = "bg-[#fbf7ee] text-stone-900";
+    cardBg = "bg-[#f5efe3] text-stone-900";
+    borderStyle = "border-2 border-stone-800";
+    textAccent = "text-rose-600 font-bold";
+    buttonPrimary = "bg-rose-600 hover:bg-rose-500 text-white font-bold border-2 border-stone-900 shadow-[3px_3px_0px_#1c1917]";
+    tagStyle = "bg-indigo-600/10 border border-indigo-600/30 text-indigo-700 font-bold";
+    shadowStyle = "shadow-[6px_6px_0px_0px_#292524]";
+  } else if (isBlueprint) {
+    themeBg = "bg-[#0b1b2b] text-sky-100";
+    cardBg = "bg-[#0f243a]/95 text-sky-50";
+    borderStyle = "border border-sky-400/30";
+    textAccent = "text-sky-300 font-mono";
+    buttonPrimary = "bg-orange-500 hover:bg-orange-400 text-black font-extrabold font-mono shadow-lg shadow-orange-500/25";
+    tagStyle = "bg-sky-500/15 border border-sky-400/30 text-sky-300 font-mono";
+    shadowStyle = "shadow-[0_0_35px_rgba(14,165,233,0.15)]";
+  } else if (isDarkLuxe) {
+    themeBg = "bg-[#070709] text-stone-100";
+    cardBg = "bg-[#111116]/95 text-stone-100";
+    borderStyle = "border border-amber-500/25";
+    textAccent = "text-amber-400 font-serif";
+    buttonPrimary = "bg-gradient-to-r from-amber-400 to-amber-600 hover:from-amber-300 hover:to-amber-500 text-black font-extrabold shadow-lg shadow-amber-500/20";
+    tagStyle = "bg-amber-400/10 border border-amber-400/25 text-amber-300";
+    shadowStyle = "shadow-[0_0_40px_rgba(245,158,11,0.15)]";
+  } else if (isVolumetric) {
+    themeBg = "bg-[#08051a] text-purple-100";
+    cardBg = "bg-[#130b2c]/90 text-purple-50";
+    borderStyle = "border border-fuchsia-500/25";
+    textAccent = "text-fuchsia-300";
+    buttonPrimary = "bg-gradient-to-r from-fuchsia-500 via-purple-500 to-cyan-500 hover:opacity-90 text-white font-bold shadow-lg shadow-fuchsia-500/25";
+    tagStyle = "bg-fuchsia-500/15 border border-fuchsia-500/30 text-fuchsia-300";
+    shadowStyle = "shadow-[0_0_40px_rgba(217,70,239,0.2)]";
   } else if (isCyberpunk) {
     themeBg = "bg-[#06070d] text-cyan-100";
     cardBg = "bg-[#0c0e1a]/95 text-cyan-50";
@@ -553,6 +595,176 @@ export function generateRichComponentHtml(userRequest: string, styleInspiration:
           <button onclick="handleAction('Executed API Test Request')" class="px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${buttonPrimary}">
             Send Test Request &rarr;
           </button>
+        </div>
+      </div>
+    `;
+  } else if (isPricing) {
+    specificUiContent = `
+      <!-- Pricing & Comparison Matrix -->
+      <div class="space-y-6">
+        <div class="text-center">
+          <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono ${tagStyle} mb-2 font-semibold">
+            ✦ Transparent Value Pricing
+          </span>
+          <h3 class="text-xl sm:text-2xl font-extrabold tracking-tight">Flexible Plans Built to Scale With You</h3>
+          <p class="text-xs opacity-70 mt-1 max-w-md mx-auto">No contracts, no surprise surge fees. Switch plans or cancel anytime.</p>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+          <div class="p-4 rounded-2xl ${isNeobrutalist ? 'bg-white border-2 border-black shadow-[3px_3px_0px_#000]' : 'bg-black/40 border border-white/10'}">
+            <div class="text-xs font-mono uppercase font-bold opacity-70">Starter</div>
+            <div class="text-2xl font-black font-mono my-2">$29<span class="text-xs font-normal opacity-60">/mo</span></div>
+            <p class="text-[11px] opacity-70 mb-4">Essential tools for independent designers and solo founders.</p>
+            <button onclick="handleAction('Selected Starter Plan')" class="w-full py-2 rounded-lg text-xs font-bold ${isNeobrutalist ? 'bg-white border-2 border-black hover:bg-zinc-100' : 'bg-white/10 hover:bg-white/15 text-white'} transition-all cursor-pointer">
+              Choose Starter
+            </button>
+          </div>
+
+          <div class="p-4 rounded-2xl ${isNeobrutalist ? 'bg-[#ffea00] border-2 border-black shadow-[5px_5px_0px_#000]' : 'bg-zinc-900 border-2 border-emerald-500/50 shadow-xl'} relative">
+            <span class="absolute -top-2.5 right-3 px-2 py-0.5 text-[9px] font-mono uppercase font-black rounded-full bg-emerald-500 text-zinc-950">MOST POPULAR</span>
+            <div class="text-xs font-mono uppercase font-bold text-emerald-400">Pro Team</div>
+            <div class="text-2xl font-black font-mono my-2">$79<span class="text-xs font-normal opacity-60">/mo</span></div>
+            <p class="text-[11px] opacity-80 mb-4">Autonomous agent generation, infinite tokens & full-stack export.</p>
+            <button onclick="handleAction('Selected Pro Team Plan')" class="w-full py-2 rounded-lg text-xs font-bold ${buttonPrimary} transition-all cursor-pointer">
+              Get Started Now &rarr;
+            </button>
+          </div>
+
+          <div class="p-4 rounded-2xl ${isNeobrutalist ? 'bg-white border-2 border-black shadow-[3px_3px_0px_#000]' : 'bg-black/40 border border-white/10'}">
+            <div class="text-xs font-mono uppercase font-bold opacity-70">Enterprise</div>
+            <div class="text-2xl font-black font-mono my-2">$249<span class="text-xs font-normal opacity-60">/mo</span></div>
+            <p class="text-[11px] opacity-70 mb-4">Dedicated cloud tenant, custom VPC endpoints & 99.99% uptime SLA.</p>
+            <button onclick="handleAction('Contact Enterprise Sales')" class="w-full py-2 rounded-lg text-xs font-bold ${isNeobrutalist ? 'bg-white border-2 border-black hover:bg-zinc-100' : 'bg-white/10 hover:bg-white/15 text-white'} transition-all cursor-pointer">
+              Talk to Sales
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  } else if (isCalculator) {
+    specificUiContent = `
+      <!-- Data Forensics & Estimator Simulator -->
+      <div class="p-5 rounded-2xl ${isNeobrutalist ? 'bg-white border-2 border-black shadow-[4px_4px_0px_#000]' : 'bg-black/50 border border-white/10'} space-y-5">
+        <div class="flex items-center justify-between pb-3 border-b ${isNeobrutalist ? 'border-black' : 'border-white/10'}">
+          <div>
+            <div class="text-xs font-mono uppercase font-bold ${textAccent}">CAPITAL FORENSICS ENGINE</div>
+            <h3 class="text-base font-bold">Opportunity Cost & Breakeven Simulator</h3>
+          </div>
+          <span class="px-2.5 py-1 text-[10px] font-mono rounded bg-emerald-500/10 text-emerald-400 font-bold">ACTIVE SIMULATION</span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <div class="flex items-center justify-between text-xs font-mono mb-1">
+              <span>Gross Outstanding Receivables:</span>
+              <span class="font-bold text-emerald-400" id="calc-rec-disp">$150,000</span>
+            </div>
+            <input type="range" min="10000" max="500000" step="5000" value="150000" oninput="document.getElementById('calc-rec-disp').textContent = '$' + parseInt(this.value).toLocaleString()" class="w-full accent-emerald-500 cursor-pointer" />
+          </div>
+
+          <div>
+            <div class="flex items-center justify-between text-xs font-mono mb-1">
+              <span>Customer Payment Delay:</span>
+              <span class="font-bold text-amber-400" id="calc-delay-disp">60 Days</span>
+            </div>
+            <input type="range" min="15" max="120" step="5" value="60" oninput="document.getElementById('calc-delay-disp').textContent = this.value + ' Days'" class="w-full accent-amber-500 cursor-pointer" />
+          </div>
+        </div>
+
+        <div class="p-4 rounded-xl ${isNeobrutalist ? 'bg-[#ffedd5] border-2 border-black' : 'bg-zinc-950/80 border border-white/10'} flex items-center justify-between">
+          <div>
+            <div class="text-[10px] font-mono uppercase opacity-70">Trapped Capital Runway Recoverable</div>
+            <div class="text-2xl font-black font-mono text-emerald-400">+$132,450.00</div>
+          </div>
+          <button onclick="handleAction('Simulation Applied & Saved')" class="px-4 py-2.5 rounded-xl text-xs font-bold ${buttonPrimary} transition-all cursor-pointer">
+            Export Liquidity Model &rarr;
+          </button>
+        </div>
+      </div>
+    `;
+  } else if (isMobileApp) {
+    specificUiContent = `
+      <!-- Mobile Web App Preview Card -->
+      <div class="max-w-xs mx-auto rounded-3xl overflow-hidden ${isNeobrutalist ? 'bg-white border-4 border-black shadow-[6px_6px_0px_#000]' : 'bg-zinc-900 border-2 border-white/20 shadow-2xl'} p-4 space-y-4">
+        <!-- Phone Status Header -->
+        <div class="flex items-center justify-between text-[10px] font-mono opacity-60 px-1">
+          <span>09:41</span>
+          <div class="flex items-center gap-1">
+            <span>5G</span>
+            <span>100%</span>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-[10px] font-mono opacity-60">Welcome, Alex</div>
+            <h4 class="text-sm font-black">Frontier Hub Mobile</h4>
+          </div>
+          <div class="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-xs">A</div>
+        </div>
+
+        <!-- Metric Card -->
+        <div class="p-3.5 rounded-2xl ${isNeobrutalist ? 'bg-[#a7f3d0] border-2 border-black' : 'bg-black/60 border border-white/10'}">
+          <div class="text-[10px] font-mono opacity-70">Active Balance</div>
+          <div class="text-xl font-bold font-mono">$24,940.50</div>
+          <div class="text-[9px] text-emerald-400 mt-1">&uarr; +18.4% today</div>
+        </div>
+
+        <!-- Action Grid -->
+        <div class="grid grid-cols-2 gap-2">
+          <button onclick="handleAction('Mobile Transfer Triggered')" class="py-2.5 px-3 rounded-xl text-xs font-bold ${isNeobrutalist ? 'bg-black text-white' : 'bg-white/10 text-white'} transition-all cursor-pointer text-center">
+            &uarr; Send
+          </button>
+          <button onclick="handleAction('Mobile Deposit Triggered')" class="py-2.5 px-3 rounded-xl text-xs font-bold ${buttonPrimary} transition-all cursor-pointer text-center">
+            &darr; Receive
+          </button>
+        </div>
+
+        <!-- Tab Bar -->
+        <div class="pt-2 border-t ${isNeobrutalist ? 'border-black' : 'border-white/10'} flex items-center justify-around text-xs opacity-70">
+          <span class="font-bold text-emerald-400">Home</span>
+          <span>Assets</span>
+          <span>Activity</span>
+          <span>Settings</span>
+        </div>
+      </div>
+    `;
+  } else if (isEventConference) {
+    specificUiContent = `
+      <!-- Event & Conference Hub -->
+      <div class="space-y-5">
+        <div class="flex items-start justify-between pb-3 border-b ${isNeobrutalist ? 'border-black' : 'border-white/10'}">
+          <div>
+            <span class="px-2.5 py-0.5 text-[10px] font-mono rounded-full ${tagStyle} font-bold">SAN FRANCISCO &bull; OCT 24-26</span>
+            <h3 class="text-xl font-black mt-1">Spatial Horizons Summit 2026</h3>
+          </div>
+          <button onclick="handleAction('Reserved VIP Conference Pass')" class="px-4 py-2 rounded-xl text-xs font-bold ${buttonPrimary} transition-all cursor-pointer">
+            Get Pass &rarr;
+          </button>
+        </div>
+
+        <div class="space-y-2.5">
+          <div class="p-3.5 rounded-xl ${isNeobrutalist ? 'bg-white border-2 border-black' : 'bg-black/40 border border-white/10'} flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <span class="text-xs font-mono font-bold text-emerald-400">09:00 AM</span>
+              <div>
+                <h4 class="text-xs font-bold">Opening Keynote: Autonomous Synthesis</h4>
+                <p class="text-[10px] opacity-70">Dr. Elena Rostova &bull; Principal Architect</p>
+              </div>
+            </div>
+            <span class="px-2 py-0.5 text-[9px] font-mono bg-white/10 rounded font-bold">MAIN STAGE</span>
+          </div>
+
+          <div class="p-3.5 rounded-xl ${isNeobrutalist ? 'bg-white border-2 border-black' : 'bg-black/40 border border-white/10'} flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <span class="text-xs font-mono font-bold text-cyan-400">11:30 AM</span>
+              <div>
+                <h4 class="text-xs font-bold">Deep Dive: Sub-Millisecond Edge Pipelines</h4>
+                <p class="text-[10px] opacity-70">Marcus Vance &bull; Head of Systems</p>
+              </div>
+            </div>
+            <span class="px-2 py-0.5 text-[9px] font-mono bg-white/10 rounded font-bold">STAGE 2</span>
+          </div>
         </div>
       </div>
     `;

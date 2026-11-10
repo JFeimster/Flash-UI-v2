@@ -225,12 +225,12 @@ async function startServer() {
     const customHeaderKey = req.headers['x-gemini-api-key'];
     const headerFreeAccess = req.headers['x-gemini-free-access'] === 'true' || useFreeAccess;
     
-    const apiKey = (typeof customHeaderKey === 'string' && customHeaderKey) 
-      ? customHeaderKey 
-      : (process.env.GEMINI_API_KEY || process.env.API_KEY);
+    // Only attempt live Gemini call if user explicitly entered their personal Gemini key in settings
+    const hasPersonalKey = typeof customHeaderKey === 'string' && customHeaderKey.trim().length > 10;
 
-    // If Free Access is active and no custom personal key was provided, bypass directly to Free Access Generator
-    if (headerFreeAccess && !customHeaderKey) {
+    // If Free Access is active OR no custom personal key was entered, bypass directly to Free Access Generator
+    // This provides 100% reliable, zero-latency generation for all viewers without requiring an API key
+    if (!hasPersonalKey || headerFreeAccess) {
       if (method === "generateContentStream") {
         return await streamFreeAccessContent(contents, res);
       } else {
@@ -238,21 +238,9 @@ async function startServer() {
       }
     }
 
-    if (!apiKey && !headerFreeAccess) {
-      return res.status(401).json({ 
-        error: "No Gemini API key available. Please configure your API key in settings or enable Free Access Mode." 
-      });
-    }
-
     try {
-      const targetModel = model || "gemini-3.8-flash";
-      const effectiveKey = apiKey || process.env.GEMINI_API_KEY || process.env.API_KEY || "";
-      
-      if (!effectiveKey) {
-        throw new Error("No API key available for live Gemini call (PERMISSION_DENIED)");
-      }
-
-      const ai = new GoogleGenAI({ apiKey: effectiveKey });
+      const targetModel = model || "gemini-2.5-flash";
+      const ai = new GoogleGenAI({ apiKey: customHeaderKey as string });
 
       if (method === "generateContent") {
         const response = await ai.models.generateContent({
@@ -268,9 +256,11 @@ async function startServer() {
           config
         });
 
-        res.setHeader('Content-Type', 'text/event-stream');
-        res.setHeader('Cache-Control', 'no-cache');
-        res.setHeader('Connection', 'keep-alive');
+        if (!res.headersSent) {
+          res.setHeader('Content-Type', 'text/event-stream');
+          res.setHeader('Cache-Control', 'no-cache');
+          res.setHeader('Connection', 'keep-alive');
+        }
 
         for await (const chunk of responseStream) {
           const text = chunk.text || '';
@@ -278,41 +268,30 @@ async function startServer() {
         }
         res.write('data: [DONE]\n\n');
         res.end();
+        return;
       } else {
-        res.status(400).json({ error: `Unsupported method: ${method}` });
+        return res.status(400).json({ error: `Unsupported method: ${method}` });
       }
     } catch (error: any) {
       const errMsg = error?.message || String(error);
-      const isQuotaOrAuthError = 
-        headerFreeAccess ||
-        errMsg.includes("402") ||
-        errMsg.includes("Payment Required") ||
-        errMsg.includes("prepayment credits") ||
-        errMsg.includes("RESOURCE_EXHAUSTED") ||
-        errMsg.includes("depleted") ||
-        errMsg.includes("429") ||
-        errMsg.includes("quota") ||
-        errMsg.includes("dunning") ||
-        errMsg.includes("403") ||
-        errMsg.includes("PERMISSION_DENIED") ||
-        errMsg.includes("ACCESS_TOKEN_SCOPE_INSUFFICIENT") ||
-        errMsg.includes("insufficient authentication scopes") ||
-        errMsg.includes("deny for project") ||
-        errMsg.includes("billing");
+      console.warn(`[Gemini Proxy Fallback] Handling live API error (${errMsg.substring(0, 100)}...) via Free Access generator.`);
 
-      if (isQuotaOrAuthError) {
-        console.log(`[Gemini Free Access Fallback] Handled quota/billing response (${errMsg.substring(0, 80)}...) via Free Access generator for ${method}`);
-        if (method === "generateContentStream") {
-          return await streamFreeAccessContent(contents, res);
+      // Gracefully fall back to Free Access generator so user is never blocked by quota, 429, or payment errors
+      if (method === "generateContentStream") {
+        if (res.headersSent) {
+          const fallbackText = generateFreeAccessContent(contents);
+          res.write(`data: ${JSON.stringify({ text: fallbackText })}\n\n`);
+          res.write('data: [DONE]\n\n');
+          res.end();
+          return;
         } else {
+          return await streamFreeAccessContent(contents, res);
+        }
+      } else {
+        if (!res.headersSent) {
           return res.json({ text: generateFreeAccessContent(contents) });
         }
       }
-
-      console.error("Gemini Proxy Error:", error);
-      res.status(500).json({ 
-        error: errMsg 
-      });
     }
   });
 

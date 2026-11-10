@@ -22,6 +22,7 @@ interface SessionDeckProps {
     onRecommendationClick?: (prompt: string) => void;
     attachments: Attachment[];
     setAttachments: React.Dispatch<React.SetStateAction<Attachment[]>>;
+    onRecoverArtifact?: (artifactId: string) => void;
 }
 
 export default function SessionDeck({
@@ -34,7 +35,8 @@ export default function SessionDeck({
     onSurpriseMe,
     onRecommendationClick,
     attachments,
-    setAttachments
+    setAttachments,
+    onRecoverArtifact
 }: SessionDeckProps) {
     const gridScrollRef = useRef<HTMLDivElement>(null);
     const [searchQuery, setSearchQuery] = useState('');
@@ -211,6 +213,7 @@ export default function SessionDeck({
                                             artifact={artifact}
                                             isFocused={isFocused}
                                             onClick={() => setFocusedArtifactIndex(aIndex)}
+                                            onRecover={onRecoverArtifact}
                                         />
                                     );
                                 })}
