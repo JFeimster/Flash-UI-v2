@@ -174,38 +174,69 @@ html, body {
     transform: translateY(1px);
 }
 
-/* === Navigation Menu === */
+/* === Navigation Menu Header Bar === */
 .nav-menu {
     position: fixed;
-    top: 24px;
-    left: 24px;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 56px;
     z-index: 9999;
     display: flex;
     align-items: center;
-    gap: 12px;
+    justify-content: space-between;
+    padding: 0 20px;
+    background: rgba(6, 6, 9, 0.82);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    box-sizing: border-box;
+}
+
+.nav-menu-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.nav-menu-left::-webkit-scrollbar {
+    display: none;
+}
+
+.nav-menu-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
 }
 
 .nav-btn {
     color: var(--text-secondary);
-    background: var(--accent-bg);
-    border: 1px solid transparent;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     backdrop-filter: blur(4px);
-    padding: 8px 16px;
+    padding: 6px 14px;
     border-radius: 99px;
-    font-size: 0.85rem;
+    font-size: 0.82rem;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s ease;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
+    gap: 6px;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .nav-btn:hover {
     color: var(--text-primary);
-    background: var(--border-color);
-    transform: scale(1.05);
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.16);
+    transform: translateY(-1px);
 }
 
 .nav-btn svg {
@@ -661,19 +692,23 @@ html, body {
 /* === Stage (The Deck) === */
 .stage-container {
     position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
+    top: 56px; left: 0; right: 0; bottom: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding-bottom: 80px; /* Offset for the input bar so you can see generations */
+    padding-bottom: 0;
     transition: all 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
+    overflow: hidden;
 }
 
-/* === Start Screen Ambient Effects === */
+/* === Start Screen Ambient Effects & Scrolling === */
 .empty-state {
     position: absolute;
     inset: 0;
-    display: flex; align-items: center; justify-content: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
     text-align: center;
     color: var(--text-secondary);
     opacity: 1;
@@ -683,7 +718,11 @@ html, body {
                 visibility 0s linear 0.8s;
     z-index: 0;
     animation: ambientFadeIn 1.5s ease-out forwards;
-    padding: 20px;
+    padding: 24px 16px 180px 16px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scroll-behavior: smooth;
+    box-sizing: border-box;
 }
 
 @keyframes ambientFadeIn {
@@ -700,35 +739,30 @@ html, body {
 
 .empty-content {
     position: relative; z-index: 1;
-    display: flex; flex-direction: column; align-items: center; gap: 24px;
+    display: flex; flex-direction: column; align-items: center; gap: 16px;
     width: 100%;
+    max-width: 960px;
+    margin: 0 auto;
 }
 
 .empty-content h1 { 
     color: var(--text-primary); 
     font-weight: 800; 
-    letter-spacing: -0.07em; 
-    font-size: 8rem;
+    letter-spacing: -0.04em; 
+    font-size: 2.75rem;
     margin: 0;
-    text-transform: uppercase;
-    background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.2) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    opacity: 0;
-    animation: dramaticEntrance 1.5s cubic-bezier(0.19, 1, 0.22, 1) forwards;
-    animation-delay: 0.2s;
-    line-height: 0.85;
+    text-transform: none;
+    opacity: 1;
+    line-height: 1.1;
 }
 
 .empty-content p {
-    font-size: 1.4rem;
-    max-width: 600px;
-    line-height: 1.4;
+    font-size: 0.95rem;
+    max-width: 640px;
+    line-height: 1.5;
     margin: 0;
-    opacity: 0;
+    opacity: 0.8;
     color: var(--text-secondary);
-    animation: dramaticEntrance 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    animation-delay: 0.5s;
 }
 
 .surprise-button {

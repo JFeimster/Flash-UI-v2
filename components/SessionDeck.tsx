@@ -116,8 +116,18 @@ export default function SessionDeck({
              {/* Empty State */}
              <div className={`empty-state ${hasStarted ? 'fade-out' : ''}`}>
                  <div className="empty-content">
-                     <h1 data-text="FLASH UI" className="glitch-hover">FLASH UI</h1>
-                     <p style={{fontFamily: 'var(--font-mono)', fontSize: '0.9rem', letterSpacing: '4px', opacity: 0.6, textShadow: '0 0 10px var(--neon-glow)'}}>CORE_ENGINE_v1.0</p>
+                     <div className="empty-header-hero text-center mb-1 animate-in">
+                         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono font-medium mb-2.5 select-none">
+                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                             AI-Powered Architecture &amp; Component Engine
+                         </div>
+                         <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-white mb-1.5 font-sans">
+                             Generate <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400">Curated Web Experiences</span>
+                         </h1>
+                         <p className="text-xs sm:text-sm text-stone-400 max-w-lg mx-auto leading-relaxed">
+                             Configure archetype, visual persona, stack, and physics &mdash; or let adaptive recommendation orchestrate the code.
+                         </p>
+                     </div>
                      
                      <SiteGeneratorMenu 
                          onGenerate={(prompt) => onRecommendationClick?.(prompt)}
@@ -125,7 +135,7 @@ export default function SessionDeck({
                      />
 
                      <div 
-                         className={`empty-dropzone ${isDragging ? 'dragging' : ''}`}
+                         className={`empty-dropzone ${isDragging ? 'dragging' : ''} !mt-2 !py-3.5 !px-4 !max-w-xl`}
                          onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
                          onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); }}
                          onDrop={async (e) => {
@@ -149,9 +159,9 @@ export default function SessionDeck({
                                  }
                              }}
                          />
-                         <UploadCloud size={24} style={{ marginBottom: '8px', color: 'var(--neon-pink)' }} />
-                         <div className="dropzone-text">GROUND WITH REFERENCE DATA OR DESIGN REFERENCE</div>
-                         <div className="dropzone-sub">Drag & Drop files or click to load (.png, .json, .csv, .txt, .zip) as context</div>
+                         <UploadCloud size={20} className="mb-1 text-cyan-400" />
+                         <div className="dropzone-text !text-xs !mb-0.5 text-cyan-400">Ground with Reference Design or Specs</div>
+                         <div className="dropzone-sub !text-[11px] text-stone-400">Drag &amp; drop files or click to load (.png, .json, .csv, .txt, .zip) as context</div>
                      </div>
 
                      {attachments && attachments.length > 0 && (
