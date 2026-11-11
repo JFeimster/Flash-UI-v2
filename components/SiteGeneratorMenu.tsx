@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
     Layout, 
     Palette, 
@@ -12,7 +12,8 @@ import {
     ChevronUp,
     Film,
     Briefcase,
-    Compass
+    Compass,
+    RotateCcw
 } from 'lucide-react';
 import IntegrationsPanel from './IntegrationsPanel';
 import { AVAILABLE_INTEGRATIONS } from '../integrationsData';
@@ -159,29 +160,141 @@ export const QUICK_PRESETS = [
     }
 ];
 
+const STORAGE_KEY = 'flash_ui_site_generator_config_v1';
+
+interface SavedGeneratorConfig {
+    selectedType?: string;
+    selectedDesign?: string;
+    selectedFramework?: string;
+    selectedAnimation?: string;
+    customType?: string;
+    customDesign?: string;
+    customFramework?: string;
+    customAnimation?: string;
+    customDomain?: string;
+    customLayoutStance?: string;
+    isAdvancedOpen?: boolean;
+    selectedDomain?: string;
+    selectedLayoutStance?: string;
+    isIntegrationsOpen?: boolean;
+    selectedIntegrations?: string[];
+    customApiKeys?: Record<string, Record<string, string>>;
+    customTopic?: string;
+}
+
+const loadSavedConfig = (): SavedGeneratorConfig | null => {
+    if (typeof window === 'undefined') return null;
+    try {
+        const item = window.localStorage.getItem(STORAGE_KEY);
+        return item ? JSON.parse(item) : null;
+    } catch (e) {
+        console.warn('Failed to parse site generator config from localStorage', e);
+        return null;
+    }
+};
+
 export default function SiteGeneratorMenu({ onGenerate, isLoading }: SiteGeneratorMenuProps) {
-    const [selectedType, setSelectedType] = useState<string>(SITE_TYPES[0].id);
-    const [selectedDesign, setSelectedDesign] = useState<string>(DESIGN_STYLES[0].id);
-    const [selectedFramework, setSelectedFramework] = useState<string>(FRAMEWORKS[0].id);
-    const [selectedAnimation, setSelectedAnimation] = useState<string>(ANIMATION_STYLES[0].id);
+    const saved = useRef(loadSavedConfig()).current;
+
+    const [selectedType, setSelectedType] = useState<string>(saved?.selectedType || SITE_TYPES[0].id);
+    const [selectedDesign, setSelectedDesign] = useState<string>(saved?.selectedDesign || DESIGN_STYLES[0].id);
+    const [selectedFramework, setSelectedFramework] = useState<string>(saved?.selectedFramework || FRAMEWORKS[0].id);
+    const [selectedAnimation, setSelectedAnimation] = useState<string>(saved?.selectedAnimation || ANIMATION_STYLES[0].id);
     
     // Custom freeform values when "Custom" is selected
-    const [customType, setCustomType] = useState<string>('');
-    const [customDesign, setCustomDesign] = useState<string>('');
-    const [customFramework, setCustomFramework] = useState<string>('');
-    const [customAnimation, setCustomAnimation] = useState<string>('');
-    const [customDomain, setCustomDomain] = useState<string>('');
-    const [customLayoutStance, setCustomLayoutStance] = useState<string>('');
+    const [customType, setCustomType] = useState<string>(saved?.customType || '');
+    const [customDesign, setCustomDesign] = useState<string>(saved?.customDesign || '');
+    const [customFramework, setCustomFramework] = useState<string>(saved?.customFramework || '');
+    const [customAnimation, setCustomAnimation] = useState<string>(saved?.customAnimation || '');
+    const [customDomain, setCustomDomain] = useState<string>(saved?.customDomain || '');
+    const [customLayoutStance, setCustomLayoutStance] = useState<string>(saved?.customLayoutStance || '');
 
     // Advanced / Fine-tune state
-    const [isAdvancedOpen, setIsAdvancedOpen] = useState<boolean>(false);
-    const [selectedDomain, setSelectedDomain] = useState<string>(INDUSTRY_DOMAINS[0].id);
-    const [selectedLayoutStance, setSelectedLayoutStance] = useState<string>(LAYOUT_STANCES[0].id);
+    const [isAdvancedOpen, setIsAdvancedOpen] = useState<boolean>(saved?.isAdvancedOpen ?? false);
+    const [selectedDomain, setSelectedDomain] = useState<string>(saved?.selectedDomain || INDUSTRY_DOMAINS[0].id);
+    const [selectedLayoutStance, setSelectedLayoutStance] = useState<string>(saved?.selectedLayoutStance || LAYOUT_STANCES[0].id);
 
     // Integrations & External Services State
-    const [isIntegrationsOpen, setIsIntegrationsOpen] = useState<boolean>(false);
-    const [selectedIntegrations, setSelectedIntegrations] = useState<string[]>(['stripe', 'supabase', 'auth0']);
-    const [customApiKeys, setCustomApiKeys] = useState<Record<string, Record<string, string>>>({});
+    const [isIntegrationsOpen, setIsIntegrationsOpen] = useState<boolean>(saved?.isIntegrationsOpen ?? false);
+    const [selectedIntegrations, setSelectedIntegrations] = useState<string[]>(
+        saved?.selectedIntegrations || ['stripe', 'supabase', 'auth0']
+    );
+    const [customApiKeys, setCustomApiKeys] = useState<Record<string, Record<string, string>>>(
+        saved?.customApiKeys || {}
+    );
+
+    const [customTopic, setCustomTopic] = useState<string>(saved?.customTopic || '');
+
+    // Auto-sync configuration to localStorage
+    useEffect(() => {
+        try {
+            const configToSave: SavedGeneratorConfig = {
+                selectedType,
+                selectedDesign,
+                selectedFramework,
+                selectedAnimation,
+                customType,
+                customDesign,
+                customFramework,
+                customAnimation,
+                customDomain,
+                customLayoutStance,
+                isAdvancedOpen,
+                selectedDomain,
+                selectedLayoutStance,
+                isIntegrationsOpen,
+                selectedIntegrations,
+                customApiKeys,
+                customTopic
+            };
+            window.localStorage.setItem(STORAGE_KEY, JSON.stringify(configToSave));
+        } catch (e) {
+            console.warn('Failed to save site generator config to localStorage', e);
+        }
+    }, [
+        selectedType,
+        selectedDesign,
+        selectedFramework,
+        selectedAnimation,
+        customType,
+        customDesign,
+        customFramework,
+        customAnimation,
+        customDomain,
+        customLayoutStance,
+        isAdvancedOpen,
+        selectedDomain,
+        selectedLayoutStance,
+        isIntegrationsOpen,
+        selectedIntegrations,
+        customApiKeys,
+        customTopic
+    ]);
+
+    const handleResetToDefaults = () => {
+        setSelectedType(SITE_TYPES[0].id);
+        setSelectedDesign(DESIGN_STYLES[0].id);
+        setSelectedFramework(FRAMEWORKS[0].id);
+        setSelectedAnimation(ANIMATION_STYLES[0].id);
+        setCustomType('');
+        setCustomDesign('');
+        setCustomFramework('');
+        setCustomAnimation('');
+        setCustomDomain('');
+        setCustomLayoutStance('');
+        setIsAdvancedOpen(false);
+        setSelectedDomain(INDUSTRY_DOMAINS[0].id);
+        setSelectedLayoutStance(LAYOUT_STANCES[0].id);
+        setIsIntegrationsOpen(false);
+        setSelectedIntegrations(['stripe', 'supabase', 'auth0']);
+        setCustomApiKeys({});
+        setCustomTopic('');
+        try {
+            window.localStorage.removeItem(STORAGE_KEY);
+        } catch (e) {
+            console.warn(e);
+        }
+    };
 
     const handleToggleIntegration = (id: string) => {
         setSelectedIntegrations(prev => 
@@ -202,8 +315,6 @@ export default function SiteGeneratorMenu({ onGenerate, isLoading }: SiteGenerat
             }
         }));
     };
-
-    const [customTopic, setCustomTopic] = useState<string>('');
 
     const handleShuffle = () => {
         // Exclude 'recommend' and 'custom' when rolling random presets
@@ -377,16 +488,29 @@ KEY REQUIREMENTS:
                         </div>
                     </div>
 
-                    <button
-                        type="button"
-                        onClick={handleShuffle}
-                        disabled={isLoading}
-                        className="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-stone-300 hover:text-white text-xs font-mono flex items-center gap-1.5 border border-white/10 transition-all cursor-pointer"
-                        title="Randomize options"
-                    >
-                        <Shuffle size={13} className="text-violet-400" />
-                        <span className="hidden sm:inline text-[11px]">Shuffle</span>
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                        <button
+                            type="button"
+                            onClick={handleResetToDefaults}
+                            disabled={isLoading}
+                            className="px-2 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-stone-400 hover:text-stone-200 text-xs font-mono flex items-center gap-1 border border-white/5 transition-all cursor-pointer"
+                            title="Reset all settings to clean defaults and clear localStorage cache"
+                        >
+                            <RotateCcw size={11} className="text-stone-400" />
+                            <span className="hidden sm:inline text-[11px]">Reset</span>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={handleShuffle}
+                            disabled={isLoading}
+                            className="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-stone-300 hover:text-white text-xs font-mono flex items-center gap-1.5 border border-white/10 transition-all cursor-pointer"
+                            title="Randomize options"
+                        >
+                            <Shuffle size={13} className="text-violet-400" />
+                            <span className="hidden sm:inline text-[11px]">Shuffle</span>
+                        </button>
+                    </div>
                 </div>
 
                 {/* 4 Core Dropdowns in Menu Row */}

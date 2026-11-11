@@ -48,6 +48,11 @@ export const INTEGRATION_PRESETS = [
         name: '🛍️ Modern E-Com', 
         ids: ['stripe', 'supabase', 'algolia', 'posthog'], 
         desc: 'Stripe + Supabase + Algolia + PostHog' 
+    },
+    { 
+        name: '💾 Offline-First', 
+        ids: ['localstorage', 'supabase'], 
+        desc: 'Browser LocalStorage Cache + Supabase Realtime' 
     }
 ];
 
@@ -148,6 +153,97 @@ export function subscribeToTable<T = any>(table: string, onEvent: (payload: T) =
   });
   return () => { sub.unsubscribe(); };
 }, []);`
+    },
+    {
+        id: 'localstorage',
+        name: 'Browser LocalStorage',
+        category: 'database',
+        categoryLabel: 'Database & Storage',
+        badge: 'Offline & Client Storage',
+        icon: '💾',
+        desc: 'Persistent client-side browser storage, JSON state synchronization & offline cache',
+        features: [
+            'useLocalStorage React state hydration hook',
+            'Cross-tab storage event synchronization',
+            'Automatic JSON serialize/deserialize with error handling',
+            'Storage quota safeguards and clear cache helper'
+        ],
+        defaultEnvKeys: {
+            NEXT_PUBLIC_STORAGE_PREFIX: 'app_cache_v1',
+            NEXT_PUBLIC_STORAGE_VERSION: '1.0.0'
+        },
+        boilerplateSnippet: `// lib/useLocalStorage.ts
+import { useState, useEffect } from 'react';
+
+export function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T | ((val: T) => T)) => void, () => void] {
+  const prefix = process.env.NEXT_PUBLIC_STORAGE_PREFIX || 'app_cache_v1';
+  const prefixedKey = \`\${prefix}_\${key}\`;
+
+  const [storedValue, setStoredValue] = useState<T>(() => {
+    if (typeof window === 'undefined') return initialValue;
+    try {
+      const item = window.localStorage.getItem(prefixedKey);
+      return item ? JSON.parse(item) : initialValue;
+    } catch (error) {
+      console.warn(\`Error reading localStorage key "\${prefixedKey}":\`, error);
+      return initialValue;
+    }
+  });
+
+  const setValue = (value: T | ((val: T) => T)) => {
+    try {
+      const valueToStore = value instanceof Function ? value(storedValue) : value;
+      setStoredValue(valueToStore);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(prefixedKey, JSON.stringify(valueToStore));
+        window.dispatchEvent(new Event('local-storage-update'));
+      }
+    } catch (error) {
+      console.warn(\`Error setting localStorage key "\${prefixedKey}":\`, error);
+    }
+  };
+
+  const removeValue = () => {
+    try {
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem(prefixedKey);
+        setStoredValue(initialValue);
+      }
+    } catch (error) {
+      console.warn(\`Error removing localStorage key "\${prefixedKey}":\`, error);
+    }
+  };
+
+  useEffect(() => {
+    const handleStorageChange = () => {
+      try {
+        const item = window.localStorage.getItem(prefixedKey);
+        if (item) setStoredValue(JSON.parse(item));
+      } catch (e) {
+        console.warn(e);
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('local-storage-update', handleStorageChange);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('local-storage-update', handleStorageChange);
+    };
+  }, [prefixedKey]);
+
+  return [storedValue, setValue, removeValue];
+}`,
+        usageExampleSnippet: `// Usage in React component
+const [cart, setCart, clearCart] = useLocalStorage<string[]>('cart_items', []);
+
+return (
+  <div className="flex items-center gap-2">
+    <button onClick={() => setCart(prev => [...prev, 'Item ' + (prev.length + 1)])}>
+      Add to LocalStorage ({cart.length})
+    </button>
+    <button onClick={clearCart}>Clear Cache</button>
+  </div>
+);`
     },
     {
         id: 'auth0',
